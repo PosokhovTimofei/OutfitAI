@@ -3,6 +3,7 @@ package com.example.myapplication.ui.theme.screens
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,24 +19,31 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.myapplication.MyApp
+import com.example.myapplication.ui.theme.screens.ClosetViewModelFactory
 
 @Composable
 fun ClosetScreen(
-    modifier: Modifier = Modifier,
-    vm: ClosetViewModel = viewModel()
+    modifier: Modifier = Modifier
 ) {
-
     val context = LocalContext.current
     val resolver = context.contentResolver
 
-    var pendingUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    // ✅ НОРМАЛЬНЫЙ ViewModel через factory
+    val vm: ClosetViewModel = viewModel(
+        factory = ClosetViewModelFactory(
+            (context.applicationContext as MyApp).repo
+        )
+    )
+
+    var pendingUri by remember { mutableStateOf<Uri?>(null) }
 
     // 📸 CAMERA
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && pendingUri != null) {
-            vm.addItem(pendingUri.toString())
+            vm.add(pendingUri.toString())
         }
     }
 
@@ -49,18 +57,25 @@ fun ClosetScreen(
     // 🖼 GALLERY
     val galleryLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let { vm.addItem(it.toString()) }
+            uri?.let {
+                vm.add(it.toString())
+            }
         }
 
-    Box(modifier.fillMaxSize().padding(16.dp)) {
+    // ✅ ROOM Flow → state
+    val items by vm.items.collectAsState()
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
 
         Column(Modifier.fillMaxSize()) {
 
             Text("OutfitAI", style = MaterialTheme.typography.headlineMedium)
 
             Spacer(Modifier.height(12.dp))
-
-            val items = vm.items
 
             if (items.isEmpty()) {
 
@@ -79,13 +94,14 @@ fun ClosetScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+
                     items(items, key = { it.id }) { item ->
 
                         AsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(item.imageUri)
                                 .crossfade(true)
-                                .size(600) // 🔥 фикс лагов
+                                .size(400)
                                 .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
@@ -100,9 +116,9 @@ fun ClosetScreen(
             Spacer(Modifier.height(80.dp))
         }
 
-        // 🔥 FIXED BUTTONS
+        // 🔥 BUTTONS
         Row(
-            Modifier
+            modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -131,8 +147,11 @@ fun ClosetScreen(
                             Manifest.permission.CAMERA
                         ) == PackageManager.PERMISSION_GRANTED
 
-                        if (granted) cameraLauncher.launch(uri)
-                        else permissionLauncher.launch(Manifest.permission.CAMERA)
+                        if (granted) {
+                            cameraLauncher.launch(uri)
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
                     }
                 }
             ) {
@@ -141,7 +160,9 @@ fun ClosetScreen(
 
             Button(
                 modifier = Modifier.weight(1f),
-                onClick = { galleryLauncher.launch("image/*") }
+                onClick = {
+                    galleryLauncher.launch("image/*")
+                }
             ) {
                 Text("🖼 Галерея")
             }
