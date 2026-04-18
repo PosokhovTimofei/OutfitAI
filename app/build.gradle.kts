@@ -66,4 +66,7 @@ dependencies {
     implementation(libs.retrofit.v290)
     implementation(libs.converter.gson.v290)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.activity.compose.v182)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.datastore.preferences)
 }
