@@ -1,10 +1,6 @@
 package com.example.myapplication.ui.theme.screens
 
-import android.Manifest
-import android.content.ContentValues
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -15,12 +11,12 @@ import androidx.compose.ui.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.example.myapplication.MyApp
+import com.example.myapplication.data.ImageStorage
+import java.io.File
 
 val typeOptions = listOf("shirt", "tshirt", "jeans", "dress", "shoes", "hat")
 val categoryOptions = listOf("top", "bottom", "shoes", "hat", "accessory")
@@ -33,7 +29,6 @@ fun ClosetScreen(
 ) {
 
     val context = LocalContext.current
-    val resolver = context.contentResolver
 
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
@@ -41,44 +36,26 @@ fun ClosetScreen(
         )
     )
 
-    // 📸 image states
-    var pendingUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedUri by remember { mutableStateOf<String?>(null) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var savedPath by remember { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
 
-    // 🧠 form states
+    var label by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptions.first()) }
     var category by remember { mutableStateOf(categoryOptions.first()) }
     var style by remember { mutableStateOf(styleOptions.first()) }
-    var label by remember { mutableStateOf("") }
 
-    // 📸 CAMERA
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success && pendingUri != null) {
-            selectedUri = pendingUri.toString()
-            showForm = true
-        }
-    }
+    val items by vm.items.collectAsState()
 
-    val permissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            if (it && pendingUri != null) {
-                cameraLauncher.launch(pendingUri!!)
-            }
-        }
-
-    // 🖼 GALLERY
+    // 📸 PICK IMAGE
     val galleryLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
-                selectedUri = it.toString()
+                selectedImageUri = it
+                savedPath = ImageStorage.saveToInternalStorage(context, it)
                 showForm = true
             }
         }
-
-    val items by vm.items.collectAsState()
 
     Box(
         modifier = modifier
@@ -86,7 +63,7 @@ fun ClosetScreen(
             .padding(16.dp)
     ) {
 
-        // 📦 GRID
+        // GRID
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -106,10 +83,7 @@ fun ClosetScreen(
                     Column {
 
                         AsyncImage(
-                            model = ImageRequest.Builder(context)
-                                .data(item.imageUri)
-                                .crossfade(true)
-                                .build(),
+                            model = File(item.imageUri),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
@@ -127,25 +101,26 @@ fun ClosetScreen(
             }
         }
 
-        // 📌 DIALOG
-        if (showForm && selectedUri != null) {
+        // FORM
+        if (showForm && savedPath != null) {
 
             AlertDialog(
                 onDismissRequest = {
                     showForm = false
-                    selectedUri = null
+                    savedPath = null
+                    label = ""
                 },
                 confirmButton = {
                     Button(onClick = {
                         vm.add(
-                            selectedUri!!,
+                            savedPath!!,
                             type,
                             category,
                             style,
                             label
                         )
                         showForm = false
-                        selectedUri = null
+                        savedPath = null
                         label = ""
                     }) {
                         Text("Сохранить")
@@ -156,29 +131,21 @@ fun ClosetScreen(
 
                     Column {
 
-                        // 🏷 label
                         OutlinedTextField(
                             value = label,
                             onValueChange = { label = it },
-                            label = { Text("Название (например: Nike Hoodie)") },
+                            label = { Text("Название") },
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(10.dp))
 
-                        // 👕 type
                         Text("Тип: $type")
                         Dropdown(typeOptions) { type = it }
 
-                        Spacer(Modifier.height(8.dp))
-
-                        // 📂 category
                         Text("Категория: $category")
                         Dropdown(categoryOptions) { category = it }
 
-                        Spacer(Modifier.height(8.dp))
-
-                        // 🎨 style
                         Text("Стиль: $style")
                         Dropdown(styleOptions) { style = it }
                     }
@@ -186,56 +153,16 @@ fun ClosetScreen(
             )
         }
 
-        // 🔘 BUTTONS
-        Row(
+        // BUTTON
+        Button(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            onClick = {
+                galleryLauncher.launch("image/*")
+            }
         ) {
-
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = {
-
-                    val values = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, "img_${System.currentTimeMillis()}.jpg")
-                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/OutfitAI")
-                    }
-
-                    val uri = resolver.insert(
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        values
-                    )
-
-                    if (uri != null) {
-                        pendingUri = uri
-
-                        val granted = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (granted) {
-                            cameraLauncher.launch(uri)
-                        } else {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    }
-                }
-            ) {
-                Text("📸 Камера")
-            }
-
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    galleryLauncher.launch("image/*")
-                }
-            ) {
-                Text("🖼 Галерея")
-            }
+            Text("🖼 Добавить фото")
         }
     }
 }

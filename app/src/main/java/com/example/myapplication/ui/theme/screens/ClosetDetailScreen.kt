@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.MyApp
+import java.io.File
 
 @Composable
 fun ClosetDetailScreen(
@@ -46,7 +47,7 @@ fun ClosetDetailScreen(
         Spacer(Modifier.height(16.dp))
 
         AsyncImage(
-            model = item.imageUri,
+            model = File(item.imageUri),
             contentDescription = null,
             modifier = Modifier
                 .fillMaxWidth()
