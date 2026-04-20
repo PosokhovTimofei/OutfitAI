@@ -9,10 +9,12 @@ class MyApp : Application() {
 
     val database by lazy {
         Room.databaseBuilder(
-            applicationContext,
+            this, // ✅ ВОТ ТУТ ИСПРАВЛЕНО
             AppDatabase::class.java,
             "closet_db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     val repo by lazy {

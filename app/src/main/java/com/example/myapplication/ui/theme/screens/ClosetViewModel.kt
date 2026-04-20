@@ -13,14 +13,29 @@ class ClosetViewModel(
 ) : ViewModel() {
 
     val items = repo.getItems()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
 
-    fun add(uri: String) { // 🔥 FIX NAME
+    // ✅ теперь доступен из UI
+    fun add(
+        uri: String,
+        type: String,
+        category: String,
+        style: String,
+        label: String
+    ) {
         viewModelScope.launch {
             repo.addItem(
                 ClosetItemEntity(
                     id = System.currentTimeMillis(),
-                    imageUri = uri
+                    imageUri = uri,
+                    type = type,
+                    category = category,
+                    style = style,
+                    label = label
                 )
             )
         }
