@@ -17,14 +17,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myapplication.MyApp
 
+val typeOptions = listOf("shirt", "tshirt", "jeans", "dress", "shoes", "hat")
+val categoryOptions = listOf("top", "bottom", "shoes", "hat", "accessory")
+val styleOptions = listOf("casual", "streetwear", "classic", "sport")
+
 @Composable
 fun ClosetScreen(
+    navController: NavController,
     modifier: Modifier = Modifier
 ) {
+
     val context = LocalContext.current
     val resolver = context.contentResolver
 
@@ -34,15 +41,15 @@ fun ClosetScreen(
         )
     )
 
+    // 📸 image states
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
-
-    // 👉 форма добавления
-    var showForm by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<String?>(null) }
+    var showForm by remember { mutableStateOf(false) }
 
-    var type by remember { mutableStateOf("shirt") }
-    var category by remember { mutableStateOf("top") }
-    var style by remember { mutableStateOf("casual") }
+    // 🧠 form states
+    var type by remember { mutableStateOf(typeOptions.first()) }
+    var category by remember { mutableStateOf(categoryOptions.first()) }
+    var style by remember { mutableStateOf(styleOptions.first()) }
     var label by remember { mutableStateOf("") }
 
     // 📸 CAMERA
@@ -79,47 +86,48 @@ fun ClosetScreen(
             .padding(16.dp)
     ) {
 
-        Column(Modifier.fillMaxSize()) {
+        // 📦 GRID
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(160.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
 
-            Text("OutfitAI", style = MaterialTheme.typography.headlineMedium)
+            items(items, key = { it.id }) { item ->
 
-            Spacer(Modifier.height(12.dp))
-
-            if (items.isEmpty()) {
-                Box(
-                    Modifier.weight(1f).fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                Card(
+                    onClick = {
+                        navController.navigate("detail/${item.id}")
+                    },
+                    modifier = Modifier.aspectRatio(1f)
                 ) {
-                    Text("Пока пусто 👀")
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(160.dp),
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(items, key = { it.id }) { item ->
+
+                    Column {
+
                         AsyncImage(
                             model = ImageRequest.Builder(context)
                                 .data(item.imageUri)
                                 .crossfade(true)
-                                .size(400)
                                 .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(1f)
+                                .weight(1f)
+                        )
+
+                        Text(
+                            text = item.label.ifEmpty { "Без названия" },
+                            modifier = Modifier.padding(6.dp),
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
             }
-
-            Spacer(Modifier.height(80.dp))
         }
 
-        // 📌 ФОРМА ПОСЛЕ ВЫБОРА ФОТО
+        // 📌 DIALOG
         if (showForm && selectedUri != null) {
 
             AlertDialog(
@@ -138,6 +146,7 @@ fun ClosetScreen(
                         )
                         showForm = false
                         selectedUri = null
+                        label = ""
                     }) {
                         Text("Сохранить")
                     }
@@ -147,32 +156,37 @@ fun ClosetScreen(
 
                     Column {
 
+                        // 🏷 label
+                        OutlinedTextField(
+                            value = label,
+                            onValueChange = { label = it },
+                            label = { Text("Название (например: Nike Hoodie)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // 👕 type
                         Text("Тип: $type")
                         Dropdown(typeOptions) { type = it }
 
                         Spacer(Modifier.height(8.dp))
 
+                        // 📂 category
                         Text("Категория: $category")
                         Dropdown(categoryOptions) { category = it }
 
                         Spacer(Modifier.height(8.dp))
 
+                        // 🎨 style
                         Text("Стиль: $style")
                         Dropdown(styleOptions) { style = it }
-
-                        Spacer(Modifier.height(8.dp))
-
-                        OutlinedTextField(
-                            value = label,
-                            onValueChange = { label = it },
-                            label = { Text("Название (Gucci кепка)") }
-                        )
                     }
                 }
             )
         }
 
-        // 🔥 BUTTONS
+        // 🔘 BUTTONS
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -183,6 +197,7 @@ fun ClosetScreen(
             Button(
                 modifier = Modifier.weight(1f),
                 onClick = {
+
                     val values = ContentValues().apply {
                         put(MediaStore.Images.Media.DISPLAY_NAME, "img_${System.currentTimeMillis()}.jpg")
                         put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
@@ -215,7 +230,9 @@ fun ClosetScreen(
 
             Button(
                 modifier = Modifier.weight(1f),
-                onClick = { galleryLauncher.launch("image/*") }
+                onClick = {
+                    galleryLauncher.launch("image/*")
+                }
             ) {
                 Text("🖼 Галерея")
             }
@@ -223,24 +240,32 @@ fun ClosetScreen(
     }
 }
 
-// 🔽 dropdown helper
 @Composable
-fun Dropdown(options: List<String>, onSelect: (String) -> Unit) {
+fun Dropdown(
+    options: List<String>,
+    onSelect: (String) -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(options.first()) }
 
     Box {
+
         Button(onClick = { expanded = true }) {
             Text(selected)
         }
 
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            options.forEach {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+
+            options.forEach { option ->
+
                 DropdownMenuItem(
-                    text = { Text(it) },
+                    text = { Text(option) },
                     onClick = {
-                        selected = it
-                        onSelect(it)
+                        selected = option
+                        onSelect(option)
                         expanded = false
                     }
                 )
@@ -248,8 +273,3 @@ fun Dropdown(options: List<String>, onSelect: (String) -> Unit) {
         }
     }
 }
-
-// 🔽 options
-val typeOptions = listOf("shirt", "tshirt", "jeans", "dress", "shoes", "hat")
-val categoryOptions = listOf("top", "bottom", "shoes", "hat", "accessory")
-val styleOptions = listOf("casual", "streetwear", "classic", "sport")
