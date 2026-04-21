@@ -1,8 +1,12 @@
 package com.example.myapplication.ui.theme.screens
 
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -16,6 +20,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -40,6 +45,7 @@ fun ClosetScreen(
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val resolver = context.contentResolver
 
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
@@ -58,38 +64,50 @@ fun ClosetScreen(
 
     val items by vm.items.collectAsState()
 
+    // =========================
+    // 📸 CAMERA
+    // =========================
+    var tempUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success && tempUri != null) {
+                handleImage(
+                    context,
+                    tempUri!!,
+                    scope,
+                    onDone = {
+                        savedPath = it
+                        showForm = true
+                    },
+                    onLoading = { isLoading = it }
+                )
+            }
+        }
+
+    val permissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted && tempUri != null) {
+                cameraLauncher.launch(tempUri!!)
+            }
+        }
+
+    // =========================
+    // 🖼 GALLERY
+    // =========================
     val galleryLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
-
-                scope.launch {
-
-                    isLoading = true
-
-                    try {
-                        val tempFile = ImageStorage.saveTemp(context, it)
-
-                        val resultFile = withContext(Dispatchers.IO) {
-                            RemoveBgApi.removeBackground(
-                                tempFile,
-                                "h1T2zDy7B56cygQzdQVcVha2"
-                            )
-                        }
-
-                        // 🔥 ОБРЕЗКА
-                        val croppedFile = withContext(Dispatchers.IO) {
-                            cropTransparent(resultFile)
-                        }
-
-                        savedPath = croppedFile.absolutePath
+                handleImage(
+                    context,
+                    it,
+                    scope,
+                    onDone = {
+                        savedPath = it
                         showForm = true
-
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-
-                    isLoading = false
-                }
+                    },
+                    onLoading = { isLoading = it }
+                )
             }
         }
 
@@ -99,6 +117,7 @@ fun ClosetScreen(
             .padding(16.dp)
     ) {
 
+        // GRID
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -108,9 +127,7 @@ fun ClosetScreen(
             items(items, key = { it.id }) { item ->
 
                 Card(
-                    onClick = {
-                        navController.navigate("detail/${item.id}")
-                    },
+                    onClick = { navController.navigate("detail/${item.id}") },
                     modifier = Modifier.aspectRatio(1f),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -121,21 +138,14 @@ fun ClosetScreen(
 
                         Column {
 
-                            Box(
+                            AsyncImage(
+                                model = File(item.imageUri),
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                                contentAlignment = Alignment.Center
-                            ) {
-
-                                AsyncImage(
-                                    model = File(item.imageUri),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                            )
 
                             Text(
                                 text = item.label.ifEmpty { "Без названия" },
@@ -149,8 +159,7 @@ fun ClosetScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "Удалить",
-                                tint = MaterialTheme.colorScheme.error
+                                contentDescription = "Удалить"
                             )
                         }
                     }
@@ -201,63 +210,100 @@ fun ClosetScreen(
             )
         }
 
-        Button(
+        // BUTTONS
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth(),
-            onClick = {
-                galleryLauncher.launch("image/*")
-            }
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("🖼 Добавить фото")
+
+            Button(
+                modifier = Modifier.weight(1f),
+                onClick = {
+
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, "img_${System.currentTimeMillis()}.jpg")
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/OutfitAI")
+                    }
+
+                    val uri = resolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        values
+                    )
+
+                    val granted = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (uri != null) {
+                        tempUri = uri
+                        if (granted) cameraLauncher.launch(uri)
+                        else permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                }
+            ) {
+                Text("📸 Камера")
+            }
+
+            Button(
+                modifier = Modifier.weight(1f),
+                onClick = { galleryLauncher.launch("image/*") }
+            ) {
+                Text("🖼 Галерея")
+            }
         }
 
         if (isLoading) {
-            Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
     }
 }
 
-@Composable
-fun Dropdown(
-    options: List<String>,
-    onSelect: (String) -> Unit
+// =========================
+// 🧠 ОБЩАЯ ОБРАБОТКА (фон + crop)
+// =========================
+private fun handleImage(
+    context: android.content.Context,
+    uri: Uri,
+    scope: kotlinx.coroutines.CoroutineScope,
+    onDone: (String) -> Unit,
+    onLoading: (Boolean) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf(options.first()) }
+    scope.launch {
+        onLoading(true)
 
-    Box {
-        Button(onClick = { expanded = true }) {
-            Text(selected)
-        }
+        try {
+            val tempFile = ImageStorage.saveTemp(context, uri)
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        selected = option
-                        onSelect(option)
-                        expanded = false
-                    }
+            val noBg = withContext(Dispatchers.IO) {
+                RemoveBgApi.removeBackground(
+                    tempFile,
+                    "h1T2zDy7B56cygQzdQVcVha2"
                 )
             }
+
+            val cropped = withContext(Dispatchers.IO) {
+                cropTransparent(noBg)
+            }
+
+            onDone(cropped.absolutePath)
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
+
+        onLoading(false)
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-// 🔥 ВОТ САМАЯ ВАЖНАЯ ЧАСТЬ (обрезка прозрачных пикселей)
-/////////////////////////////////////////////////////////////////////////////////////
-
+// =========================
+// ✂️ CROP TRANSPARENT
+// =========================
 fun cropTransparent(file: File): File {
 
     val bitmap = BitmapFactory.decodeFile(file.absolutePath)
@@ -272,7 +318,7 @@ fun cropTransparent(file: File): File {
 
             val alpha = (bitmap.getPixel(x, y) shr 24) and 0xff
 
-            if (alpha > 10) { // не полностью прозрачный
+            if (alpha > 10) {
 
                 if (x < minX) minX = x
                 if (y < minY) minY = y
@@ -282,7 +328,6 @@ fun cropTransparent(file: File): File {
         }
     }
 
-    // защита от краша
     if (maxX <= minX || maxY <= minY) return file
 
     val cropped = Bitmap.createBitmap(
@@ -302,4 +347,38 @@ fun cropTransparent(file: File): File {
     out.close()
 
     return newFile
+}
+
+@Composable
+fun Dropdown(
+    options: List<String>,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(options.first()) }
+
+    Box {
+
+        Button(onClick = { expanded = true }) {
+            Text(selected)
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+
+            options.forEach { option ->
+
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        selected = option
+                        onSelect(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
