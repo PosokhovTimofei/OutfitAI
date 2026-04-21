@@ -9,7 +9,6 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material.icons.Icons
@@ -53,14 +52,7 @@ fun ClosetScreen(
         )
     )
 
-    var savedPath by remember { mutableStateOf<String?>(null) }
-    var showForm by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
-
-    var label by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf(typeOptions.first()) }
-    var category by remember { mutableStateOf(categoryOptions.first()) }
-    var style by remember { mutableStateOf(styleOptions.first()) }
 
     val items by vm.items.collectAsState()
 
@@ -77,8 +69,7 @@ fun ClosetScreen(
                     tempUri!!,
                     scope,
                     onDone = {
-                        savedPath = it
-                        showForm = true
+                        navController.navigate("addItem/${Uri.encode(it)}")
                     },
                     onLoading = { isLoading = it }
                 )
@@ -103,8 +94,7 @@ fun ClosetScreen(
                     it,
                     scope,
                     onDone = {
-                        savedPath = it
-                        showForm = true
+                        navController.navigate("addItem/${Uri.encode(it)}")
                     },
                     onLoading = { isLoading = it }
                 )
@@ -117,7 +107,9 @@ fun ClosetScreen(
             .padding(16.dp)
     ) {
 
-        // GRID
+        // =========================
+        // 📦 GRID
+        // =========================
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -167,50 +159,9 @@ fun ClosetScreen(
             }
         }
 
-        // FORM
-        if (showForm && savedPath != null) {
-
-            AlertDialog(
-                onDismissRequest = {
-                    showForm = false
-                    savedPath = null
-                },
-                confirmButton = {
-                    Button(onClick = {
-                        vm.add(savedPath!!, type, category, style, label)
-                        showForm = false
-                        savedPath = null
-                        label = ""
-                    }) {
-                        Text("Сохранить")
-                    }
-                },
-                title = { Text("Добавить вещь") },
-                text = {
-                    Column {
-
-                        OutlinedTextField(
-                            value = label,
-                            onValueChange = { label = it },
-                            label = { Text("Название") }
-                        )
-
-                        Spacer(Modifier.height(8.dp))
-
-                        Text("Тип: $type")
-                        Dropdown(typeOptions) { type = it }
-
-                        Text("Категория: $category")
-                        Dropdown(categoryOptions) { category = it }
-
-                        Text("Стиль: $style")
-                        Dropdown(styleOptions) { style = it }
-                    }
-                }
-            )
-        }
-
-        // BUTTONS
+        // =========================
+        // 🔘 BUTTONS
+        // =========================
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -256,6 +207,9 @@ fun ClosetScreen(
             }
         }
 
+        // =========================
+        // ⏳ LOADING
+        // =========================
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -265,7 +219,7 @@ fun ClosetScreen(
 }
 
 // =========================
-// 🧠 ОБЩАЯ ОБРАБОТКА (фон + crop)
+// 🧠 IMAGE PROCESSING
 // =========================
 private fun handleImage(
     context: android.content.Context,
@@ -319,7 +273,6 @@ fun cropTransparent(file: File): File {
             val alpha = (bitmap.getPixel(x, y) shr 24) and 0xff
 
             if (alpha > 10) {
-
                 if (x < minX) minX = x
                 if (y < minY) minY = y
                 if (x > maxX) maxX = x
@@ -349,6 +302,9 @@ fun cropTransparent(file: File): File {
     return newFile
 }
 
+// =========================
+// 🔽 DROPDOWN
+// =========================
 @Composable
 fun Dropdown(
     options: List<String>,
