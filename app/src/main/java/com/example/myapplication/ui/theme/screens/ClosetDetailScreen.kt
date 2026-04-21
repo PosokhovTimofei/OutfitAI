@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.myapplication.MyApp
 import java.io.File
 
@@ -46,14 +47,24 @@ fun ClosetDetailScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        AsyncImage(
-            model = File(item.imageUri),
-            contentDescription = null,
+        // 🔥 ВАЖНО: убрали Crop
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f),
-            contentScale = ContentScale.Crop
-        )
+                .height(400.dp),
+            contentAlignment = Alignment.Center
+        ) {
+
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(File(item.imageUri))
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit, // 🔥 FIX: НЕ crop
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         Spacer(Modifier.height(16.dp))
 
