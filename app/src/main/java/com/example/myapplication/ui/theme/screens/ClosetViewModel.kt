@@ -40,4 +40,14 @@ class ClosetViewModel(
             )
         }
     }
+    fun delete(item: ClosetItemEntity) {
+        viewModelScope.launch {
+
+            val file = java.io.File(item.imageUri)
+            if (file.exists()) file.delete()
+
+            repo.deleteItem(item)
+        }
+    }
 }
+

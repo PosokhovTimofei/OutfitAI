@@ -1,10 +1,15 @@
 package com.example.myapplication.ui.theme.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -16,7 +21,12 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.MyApp
 import com.example.myapplication.data.ImageStorage
+import com.example.myapplication.data.RemoveBgApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 
 val typeOptions = listOf("shirt", "tshirt", "jeans", "dress", "shoes", "hat")
 val categoryOptions = listOf("top", "bottom", "shoes", "hat", "accessory")
@@ -29,6 +39,7 @@ fun ClosetScreen(
 ) {
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
@@ -36,9 +47,9 @@ fun ClosetScreen(
         )
     )
 
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var savedPath by remember { mutableStateOf<String?>(null) }
     var showForm by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     var label by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptions.first()) }
@@ -47,13 +58,38 @@ fun ClosetScreen(
 
     val items by vm.items.collectAsState()
 
-    // 📸 PICK IMAGE
     val galleryLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             uri?.let {
-                selectedImageUri = it
-                savedPath = ImageStorage.saveToInternalStorage(context, it)
-                showForm = true
+
+                scope.launch {
+
+                    isLoading = true
+
+                    try {
+                        val tempFile = ImageStorage.saveTemp(context, it)
+
+                        val resultFile = withContext(Dispatchers.IO) {
+                            RemoveBgApi.removeBackground(
+                                tempFile,
+                                "h1T2zDy7B56cygQzdQVcVha2"
+                            )
+                        }
+
+                        // 🔥 ОБРЕЗКА
+                        val croppedFile = withContext(Dispatchers.IO) {
+                            cropTransparent(resultFile)
+                        }
+
+                        savedPath = croppedFile.absolutePath
+                        showForm = true
+
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+
+                    isLoading = false
+                }
             }
         }
 
@@ -63,12 +99,10 @@ fun ClosetScreen(
             .padding(16.dp)
     ) {
 
-        // GRID
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxSize()
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
             items(items, key = { it.id }) { item ->
@@ -77,25 +111,48 @@ fun ClosetScreen(
                     onClick = {
                         navController.navigate("detail/${item.id}")
                     },
-                    modifier = Modifier.aspectRatio(1f)
+                    modifier = Modifier.aspectRatio(1f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
 
-                    Column {
+                    Box(Modifier.fillMaxSize()) {
 
-                        AsyncImage(
-                            model = File(item.imageUri),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                        )
+                        Column {
 
-                        Text(
-                            text = item.label.ifEmpty { "Без названия" },
-                            modifier = Modifier.padding(6.dp),
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+
+                                AsyncImage(
+                                    model = File(item.imageUri),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+
+                            Text(
+                                text = item.label.ifEmpty { "Без названия" },
+                                modifier = Modifier.padding(6.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { vm.delete(item) },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Удалить",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
@@ -108,17 +165,10 @@ fun ClosetScreen(
                 onDismissRequest = {
                     showForm = false
                     savedPath = null
-                    label = ""
                 },
                 confirmButton = {
                     Button(onClick = {
-                        vm.add(
-                            savedPath!!,
-                            type,
-                            category,
-                            style,
-                            label
-                        )
+                        vm.add(savedPath!!, type, category, style, label)
                         showForm = false
                         savedPath = null
                         label = ""
@@ -128,17 +178,15 @@ fun ClosetScreen(
                 },
                 title = { Text("Добавить вещь") },
                 text = {
-
                     Column {
 
                         OutlinedTextField(
                             value = label,
                             onValueChange = { label = it },
-                            label = { Text("Название") },
-                            modifier = Modifier.fillMaxWidth()
+                            label = { Text("Название") }
                         )
 
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         Text("Тип: $type")
                         Dropdown(typeOptions) { type = it }
@@ -153,7 +201,6 @@ fun ClosetScreen(
             )
         }
 
-        // BUTTON
         Button(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -163,6 +210,15 @@ fun ClosetScreen(
             }
         ) {
             Text("🖼 Добавить фото")
+        }
+
+        if (isLoading) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
         }
     }
 }
@@ -176,7 +232,6 @@ fun Dropdown(
     var selected by remember { mutableStateOf(options.first()) }
 
     Box {
-
         Button(onClick = { expanded = true }) {
             Text(selected)
         }
@@ -185,9 +240,7 @@ fun Dropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-
             options.forEach { option ->
-
                 DropdownMenuItem(
                     text = { Text(option) },
                     onClick = {
@@ -199,4 +252,54 @@ fun Dropdown(
             }
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+// 🔥 ВОТ САМАЯ ВАЖНАЯ ЧАСТЬ (обрезка прозрачных пикселей)
+/////////////////////////////////////////////////////////////////////////////////////
+
+fun cropTransparent(file: File): File {
+
+    val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+
+    var minX = bitmap.width
+    var minY = bitmap.height
+    var maxX = 0
+    var maxY = 0
+
+    for (y in 0 until bitmap.height) {
+        for (x in 0 until bitmap.width) {
+
+            val alpha = (bitmap.getPixel(x, y) shr 24) and 0xff
+
+            if (alpha > 10) { // не полностью прозрачный
+
+                if (x < minX) minX = x
+                if (y < minY) minY = y
+                if (x > maxX) maxX = x
+                if (y > maxY) maxY = y
+            }
+        }
+    }
+
+    // защита от краша
+    if (maxX <= minX || maxY <= minY) return file
+
+    val cropped = Bitmap.createBitmap(
+        bitmap,
+        minX,
+        minY,
+        maxX - minX,
+        maxY - minY
+    )
+
+    val newFile = File(file.parent, "cropped_${file.name}")
+    val out = FileOutputStream(newFile)
+
+    cropped.compress(Bitmap.CompressFormat.PNG, 100, out)
+
+    out.flush()
+    out.close()
+
+    return newFile
 }

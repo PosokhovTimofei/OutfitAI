@@ -13,4 +13,7 @@ interface ClosetDao {
 
     @Insert
     suspend fun insert(item: ClosetItemEntity)
+
+    @androidx.room.Delete
+    suspend fun delete(item: ClosetItemEntity)
 }

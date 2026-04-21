@@ -8,14 +8,14 @@ import java.util.UUID
 
 object ImageStorage {
 
-    fun saveToInternalStorage(context: Context, uri: Uri): String {
+    fun saveTemp(context: Context, uri: Uri): File {
 
         val inputStream = context.contentResolver.openInputStream(uri)
             ?: throw IllegalStateException("Cannot open image")
 
         val file = File(
             context.filesDir,
-            "img_${UUID.randomUUID()}.jpg"
+            "temp_${UUID.randomUUID()}.jpg"
         )
 
         val outputStream = FileOutputStream(file)
@@ -25,6 +25,6 @@ object ImageStorage {
         inputStream.close()
         outputStream.close()
 
-        return file.absolutePath
+        return file
     }
 }
