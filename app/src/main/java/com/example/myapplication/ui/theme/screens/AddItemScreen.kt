@@ -35,59 +35,107 @@ fun EraserEditor(
     file: File,
     onSave: (File) -> Unit
 ) {
+    val originalBitmap = remember {
+        BitmapFactory.decodeFile(file.absolutePath)
+    }
+
     var bitmap by remember {
         mutableStateOf(
-            BitmapFactory.decodeFile(file.absolutePath)
-                .copy(Bitmap.Config.ARGB_8888, true)
+            originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
         )
     }
+
+    var brushSize by remember { mutableStateOf(50f) }
+
+    var lastPoint by remember { mutableStateOf<Offset?>(null) }
+
+    // 🔥 фиксированные трансформации (ВАЖНО!)
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
 
     val paint = remember {
         Paint().apply {
             isAntiAlias = true
             style = Paint.Style.STROKE
-            strokeWidth = 50f
+            strokeCap = Paint.Cap.ROUND
             xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
         }
     }
-
-    var lastPoint by remember { mutableStateOf<Offset?>(null) }
-    var brushSize by remember { mutableStateOf(50f) }
 
     Column {
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(350.dp)
+
+                .pointerInput(scale, offset, brushSize) {
+
+                    detectDragGestures(
+                        onDragStart = { touch ->
+
+                            // 🔥 переводим экран → bitmap координаты СРАЗУ
+                            val bx = (touch.x - offset.x) / scale
+                            val by = (touch.y - offset.y) / scale
+
+                            lastPoint = Offset(bx, by)
+                        },
+
+                        onDrag = { change, _ ->
+
+                            val canvas = Canvas(bitmap)
+
+                            val x = (change.position.x - offset.x) / scale
+                            val y = (change.position.y - offset.y) / scale
+
+                            val lp = lastPoint
+
+                            if (lp != null) {
+                                paint.strokeWidth = brushSize / scale
+
+                                canvas.drawLine(
+                                    lp.x, lp.y,
+                                    x, y,
+                                    paint
+                                )
+                            }
+
+                            lastPoint = Offset(x, y)
+
+                            bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                        },
+
+                        onDragEnd = { lastPoint = null }
+                    )
+                }
         ) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { lastPoint = it },
-                            onDrag = { change, _ ->
-                                val current = change.position
-                                val canvas = Canvas(bitmap)
 
-                                lastPoint?.let {
-                                    canvas.drawLine(
-                                        it.x, it.y,
-                                        current.x, current.y,
-                                        paint.apply { strokeWidth = brushSize }
-                                    )
-                                }
+            Canvas(modifier = Modifier.fillMaxSize()) {
 
-                                lastPoint = current
+                val imgW = bitmap.width.toFloat()
+                val imgH = bitmap.height.toFloat()
 
-                                bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-                            },
-                            onDragEnd = { lastPoint = null }
-                        )
-                    }
-            ) {
-                drawImage(bitmap.asImageBitmap())
+                // 🔥 FIT_CENTER (ОДИНАКОВО для draw + touch)
+                scale = minOf(
+                    size.width / imgW,
+                    size.height / imgH
+                )
+
+                val drawW = imgW * scale
+                val drawH = imgH * scale
+
+                offset = Offset(
+                    (size.width - drawW) / 2f,
+                    (size.height - drawH) / 2f
+                )
+
+                drawIntoCanvas { canvas ->
+                    canvas.save()
+                    canvas.translate(offset.x, offset.y)
+                    canvas.scale(scale, scale)
+                    canvas.nativeCanvas.drawBitmap(bitmap, 0f, 0f, null)
+                    canvas.restore()
+                }
             }
         }
 
@@ -113,8 +161,7 @@ fun EraserEditor(
         ) {
 
             Button(onClick = {
-                bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                    .copy(Bitmap.Config.ARGB_8888, true)
+                bitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
             }) {
                 Text("Сброс")
             }
