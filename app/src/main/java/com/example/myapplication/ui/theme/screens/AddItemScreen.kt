@@ -1,6 +1,8 @@
 package com.example.myapplication.ui.theme.screens
 
-import androidx.compose.foundation.clickable
+import android.graphics.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,17 +11,136 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
+
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.myapplication.MyApp
 import java.io.File
+import java.io.FileOutputStream
 
-// ✅ РУССКИЕ СПИСКИ
+// ==========================
+// 🔥 ЛАСТИК
+// ==========================
+@Composable
+fun EraserEditor(
+    file: File,
+    onSave: (File) -> Unit
+) {
+    var bitmap by remember {
+        mutableStateOf(
+            BitmapFactory.decodeFile(file.absolutePath)
+                .copy(Bitmap.Config.ARGB_8888, true)
+        )
+    }
+
+    val paint = remember {
+        Paint().apply {
+            isAntiAlias = true
+            style = Paint.Style.STROKE
+            strokeWidth = 50f
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+        }
+    }
+
+    var lastPoint by remember { mutableStateOf<Offset?>(null) }
+    var brushSize by remember { mutableStateOf(50f) }
+
+    Column {
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = { lastPoint = it },
+                            onDrag = { change, _ ->
+                                val current = change.position
+                                val canvas = Canvas(bitmap)
+
+                                lastPoint?.let {
+                                    canvas.drawLine(
+                                        it.x, it.y,
+                                        current.x, current.y,
+                                        paint.apply { strokeWidth = brushSize }
+                                    )
+                                }
+
+                                lastPoint = current
+
+                                bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                            },
+                            onDragEnd = { lastPoint = null }
+                        )
+                    }
+            ) {
+                drawImage(bitmap.asImageBitmap())
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            "Размер кисти: ${brushSize.toInt()}",
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Slider(
+            value = brushSize,
+            onValueChange = { brushSize = it },
+            valueRange = 10f..120f,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+
+            Button(onClick = {
+                bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    .copy(Bitmap.Config.ARGB_8888, true)
+            }) {
+                Text("Сброс")
+            }
+
+            Button(onClick = {
+                val outFile = File(
+                    file.parentFile,
+                    "edited_${System.currentTimeMillis()}.png"
+                )
+
+                FileOutputStream(outFile).use {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+
+                onSave(outFile)
+            }) {
+                Text("Сохранить")
+            }
+        }
+    }
+}
+
+// ==========================
+// 📦 AddItemScreen
+// ==========================
+
 val typeOptionsRu = listOf("Футболка", "Рубашка", "Джинсы", "Платье", "Обувь", "Головной убор")
 val categoryOptionsRu = listOf("Верх", "Низ", "Обувь", "Головной убор", "Аксессуар")
 val styleOptionsRu = listOf("Повседневный", "Уличный", "Классический", "Спортивный")
@@ -32,12 +153,13 @@ fun AddItemScreen(
     navController: NavController
 ) {
     val context = LocalContext.current
-
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
             (context.applicationContext as MyApp).repo
         )
     )
+
+    var currentImagePath by remember { mutableStateOf(imagePath) }
 
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptionsRu.first()) }
@@ -68,20 +190,17 @@ fun AddItemScreen(
         modifier = Modifier.fillMaxSize()
     ) {
 
+        // ================= ЛАСТИК ВМЕСТО AsyncImage =================
         item {
-            AsyncImage(
-                model = File(imagePath),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .padding(8.dp)
+            EraserEditor(
+                file = File(currentImagePath),
+                onSave = { savedFile ->
+                    currentImagePath = savedFile.absolutePath
+                }
             )
         }
 
         item {
-
             Column(modifier = Modifier.padding(16.dp)) {
 
                 OutlinedTextField(
@@ -93,45 +212,27 @@ fun AddItemScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // 🔥 КАТЕГОРИЯ (теперь с материалом)
                 SectionCard("Категория", Icons.Default.Checkroom) {
 
-                    SelectRow(
-                        label = "Тип одежды",
-                        value = type,
-                        icon = Icons.Default.Style
-                    ) {
+                    SelectRow("Тип одежды", type, Icons.Default.Style) {
                         currentOptions = typeOptionsRu
                         onSelect = { type = it }
                         showSheet = true
                     }
 
-                    SelectRow(
-                        label = "Раздел",
-                        value = category,
-                        icon = Icons.Default.Category
-                    ) {
+                    SelectRow("Раздел", category, Icons.Default.Category) {
                         currentOptions = categoryOptionsRu
                         onSelect = { category = it }
                         showSheet = true
                     }
 
-                    SelectRow(
-                        label = "Стиль",
-                        value = style,
-                        icon = Icons.Default.AutoAwesome
-                    ) {
+                    SelectRow("Стиль", style, Icons.Default.AutoAwesome) {
                         currentOptions = styleOptionsRu
                         onSelect = { style = it }
                         showSheet = true
                     }
 
-                    // ✅ МАТЕРИАЛ ПЕРЕНЕСЁН СЮДА
-                    SelectRow(
-                        label = "Материал",
-                        value = material,
-                        icon = Icons.Default.Texture
-                    ) {
+                    SelectRow("Материал", material, Icons.Default.Texture) {
                         currentOptions = materialOptionsRu
                         onSelect = { material = it }
                         showSheet = true
@@ -140,7 +241,6 @@ fun AddItemScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // 🔥 ДОПОЛНИТЕЛЬНО
                 SectionCard("Дополнительно", Icons.Default.Tune) {
 
                     OutlinedTextField(
@@ -174,15 +274,14 @@ fun AddItemScreen(
 
                 Spacer(Modifier.height(32.dp))
 
-                // ✅ ВАЖНО: поднимаем кнопку
                 Button(
                     onClick = {
-                        vm.add(imagePath, type, category, style, name)
+                        vm.add(currentImagePath, type, category, style, name)
                         navController.popBackStack()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding() // 🔥 фикс Samsung
+                        .navigationBarsPadding()
                         .padding(bottom = 8.dp)
                 ) {
                     Text("Сохранить")
@@ -192,6 +291,8 @@ fun AddItemScreen(
     }
 }
 
+// ================= UI HELPERS =================
+
 @Composable
 fun SectionCard(
     title: String,
@@ -199,21 +300,15 @@ fun SectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(16.dp)) {
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row {
                 Icon(icon, null)
                 Spacer(Modifier.width(8.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(title)
             }
-
             Spacer(Modifier.height(12.dp))
-
             content()
         }
     }
@@ -232,21 +327,17 @@ fun SelectRow(
             .clickable { onClick() }
             .padding(vertical = 12.dp)
     ) {
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row {
             Icon(icon, null)
             Spacer(Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelSmall)
+            Column(Modifier.weight(1f)) {
+                Text(label)
                 Text(value)
             }
-
             Icon(Icons.Default.ArrowDropDown, null)
         }
+        Divider()
     }
-
-    Divider()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -256,7 +347,6 @@ fun SelectBottomSheet(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-
     var search by remember { mutableStateOf("") }
 
     val filtered = options.filter {
@@ -264,7 +354,6 @@ fun SelectBottomSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
-
         Column(Modifier.padding(16.dp)) {
 
             OutlinedTextField(
