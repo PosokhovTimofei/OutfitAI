@@ -33,25 +33,26 @@ import java.io.FileOutputStream
 @Composable
 fun EraserEditor(
     file: File,
+    bitmap: Bitmap?,
+    onBitmapChange: (Bitmap) -> Unit,
     onSave: (File) -> Unit
 ) {
     val originalBitmap = remember {
         BitmapFactory.decodeFile(file.absolutePath)
     }
 
-    var bitmap by remember {
-        mutableStateOf(
-            originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-        )
+    // 🔥 главный фикс — используем внешний bitmap
+    val workingBitmap = remember(bitmap) {
+        bitmap ?: originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
     }
 
     var brushSize by remember { mutableStateOf(50f) }
-
     var lastPoint by remember { mutableStateOf<Offset?>(null) }
 
-    // 🔥 фиксированные трансформации (ВАЖНО!)
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+
+    var redrawTrigger by remember { mutableStateOf(0) }
 
     val paint = remember {
         Paint().apply {
@@ -68,41 +69,33 @@ fun EraserEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(350.dp)
-
                 .pointerInput(scale, offset, brushSize) {
 
                     detectDragGestures(
                         onDragStart = { touch ->
-
-                            // 🔥 переводим экран → bitmap координаты СРАЗУ
                             val bx = (touch.x - offset.x) / scale
                             val by = (touch.y - offset.y) / scale
-
                             lastPoint = Offset(bx, by)
                         },
 
                         onDrag = { change, _ ->
 
-                            val canvas = Canvas(bitmap)
+                            val canvas = Canvas(workingBitmap)
 
                             val x = (change.position.x - offset.x) / scale
                             val y = (change.position.y - offset.y) / scale
 
-                            val lp = lastPoint
-
-                            if (lp != null) {
+                            lastPoint?.let {
                                 paint.strokeWidth = brushSize / scale
-
-                                canvas.drawLine(
-                                    lp.x, lp.y,
-                                    x, y,
-                                    paint
-                                )
+                                canvas.drawLine(it.x, it.y, x, y, paint)
                             }
 
                             lastPoint = Offset(x, y)
 
-                            bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                            // 🔥 сохраняем bitmap наружу
+                            onBitmapChange(workingBitmap)
+
+                            redrawTrigger++
                         },
 
                         onDragEnd = { lastPoint = null }
@@ -110,31 +103,32 @@ fun EraserEditor(
                 }
         ) {
 
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            key(redrawTrigger) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
 
-                val imgW = bitmap.width.toFloat()
-                val imgH = bitmap.height.toFloat()
+                    val imgW = workingBitmap.width.toFloat()
+                    val imgH = workingBitmap.height.toFloat()
 
-                // 🔥 FIT_CENTER (ОДИНАКОВО для draw + touch)
-                scale = minOf(
-                    size.width / imgW,
-                    size.height / imgH
-                )
+                    scale = minOf(
+                        size.width / imgW,
+                        size.height / imgH
+                    )
 
-                val drawW = imgW * scale
-                val drawH = imgH * scale
+                    val drawW = imgW * scale
+                    val drawH = imgH * scale
 
-                offset = Offset(
-                    (size.width - drawW) / 2f,
-                    (size.height - drawH) / 2f
-                )
+                    offset = Offset(
+                        (size.width - drawW) / 2f,
+                        (size.height - drawH) / 2f
+                    )
 
-                drawIntoCanvas { canvas ->
-                    canvas.save()
-                    canvas.translate(offset.x, offset.y)
-                    canvas.scale(scale, scale)
-                    canvas.nativeCanvas.drawBitmap(bitmap, 0f, 0f, null)
-                    canvas.restore()
+                    drawIntoCanvas { canvas ->
+                        canvas.save()
+                        canvas.translate(offset.x, offset.y)
+                        canvas.scale(scale, scale)
+                        canvas.nativeCanvas.drawBitmap(workingBitmap, 0f, 0f, null)
+                        canvas.restore()
+                    }
                 }
             }
         }
@@ -161,24 +155,11 @@ fun EraserEditor(
         ) {
 
             Button(onClick = {
-                bitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                val reset = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                onBitmapChange(reset)
+                redrawTrigger++
             }) {
                 Text("Сброс")
-            }
-
-            Button(onClick = {
-                val outFile = File(
-                    file.parentFile,
-                    "edited_${System.currentTimeMillis()}.png"
-                )
-
-                FileOutputStream(outFile).use {
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                }
-
-                onSave(outFile)
-            }) {
-                Text("Сохранить")
             }
         }
     }
@@ -205,6 +186,9 @@ fun AddItemScreen(
             (context.applicationContext as MyApp).repo
         )
     )
+    var editBitmap by remember {
+        mutableStateOf<Bitmap?>(null)
+    }
 
     var currentImagePath by remember { mutableStateOf(imagePath) }
 
@@ -241,8 +225,11 @@ fun AddItemScreen(
         item {
             EraserEditor(
                 file = File(currentImagePath),
+                bitmap = editBitmap,
+                onBitmapChange = { editBitmap = it },
                 onSave = { savedFile ->
                     currentImagePath = savedFile.absolutePath
+                    editBitmap = null
                 }
             )
         }
@@ -323,7 +310,27 @@ fun AddItemScreen(
 
                 Button(
                     onClick = {
-                        vm.add(currentImagePath, type, category, style, name)
+
+                        val finalFile = File(
+                            File(currentImagePath).parentFile,
+                            "edited_${System.currentTimeMillis()}.png"
+                        )
+
+                        val bitmapToSave = editBitmap
+                            ?: BitmapFactory.decodeFile(currentImagePath)
+
+                        FileOutputStream(finalFile).use {
+                            bitmapToSave.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        }
+
+                        vm.add(
+                            finalFile.absolutePath,
+                            type,
+                            category,
+                            style,
+                            name
+                        )
+
                         navController.popBackStack()
                     },
                     modifier = Modifier
