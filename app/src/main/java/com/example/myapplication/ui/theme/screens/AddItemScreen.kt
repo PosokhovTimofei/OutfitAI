@@ -42,9 +42,7 @@ fun EraserEditor(
     }
 
     // 🔥 главный фикс — используем внешний bitmap
-    val workingBitmap = remember(bitmap) {
-        bitmap ?: originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-    }
+    val workingBitmap = bitmap ?: originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
 
     var brushSize by remember { mutableStateOf(50f) }
     var lastPoint by remember { mutableStateOf<Offset?>(null) }
@@ -69,7 +67,7 @@ fun EraserEditor(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(350.dp)
-                .pointerInput(scale, offset, brushSize) {
+                .pointerInput(bitmap, scale, offset) {
 
                     detectDragGestures(
                         onDragStart = { touch ->
