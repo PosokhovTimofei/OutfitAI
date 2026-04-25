@@ -75,7 +75,7 @@ fun ClosetDetailScreen(
     var color by remember { mutableStateOf(item.color ?: "Черный") }
     var material by remember { mutableStateOf(item.material ?: "Хлопок") }
 
-    var imagePath by remember { mutableStateOf(item.imageUri) }
+    val imagePath = item.imageUri
 
     // ================= OPTIONS =================
     val colorOptions = listOf(

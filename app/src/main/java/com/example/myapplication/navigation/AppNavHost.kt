@@ -49,5 +49,17 @@ fun AppNavHost() {
                 )
             }
         }
+
+        composable("editor/{itemId}") { backStackEntry ->
+
+            val itemId = backStackEntry.arguments
+                ?.getString("itemId")
+                ?.toLongOrNull() ?: return@composable
+
+            EditorScreen(
+                itemId = itemId,
+                navController = navController
+            )
+        }
     }
 }
