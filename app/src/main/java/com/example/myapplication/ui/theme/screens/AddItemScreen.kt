@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -300,163 +301,213 @@ fun AddItemScreen(
             (context.applicationContext as MyApp).repo
         )
     )
-    var editBitmap by remember {
-        mutableStateOf<Bitmap?>(null)
-    }
 
+    val colorOptionsRu = listOf(
+        "Черный" to androidx.compose.ui.graphics.Color.Black,
+        "Белый" to androidx.compose.ui.graphics.Color.White,
+        "Синий" to androidx.compose.ui.graphics.Color(0xFF2196F3),
+        "Красный" to androidx.compose.ui.graphics.Color(0xFFF44336),
+        "Зеленый" to androidx.compose.ui.graphics.Color(0xFF4CAF50),
+        "Желтый" to androidx.compose.ui.graphics.Color(0xFFFFEB3B)
+    )
+
+    var editBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var currentImagePath by remember { mutableStateOf(imagePath) }
 
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptionsRu.first()) }
     var category by remember { mutableStateOf(categoryOptionsRu.first()) }
     var style by remember { mutableStateOf(styleOptionsRu.first()) }
+
     var material by remember { mutableStateOf(materialOptionsRu.first()) }
+    var color by remember { mutableStateOf(colorOptionsRu.first().first) }
 
     var brand by remember { mutableStateOf("") }
-    var tags by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
 
     var currentOptions by remember { mutableStateOf(listOf<String>()) }
     var onSelect by remember { mutableStateOf<(String) -> Unit>({}) }
     var showSheet by remember { mutableStateOf(false) }
-
+    var selectingColors by remember { mutableStateOf(false) }
     var lockScroll by remember { mutableStateOf(false) }
 
+    // ================= BOTTOM SHEET =================
     if (showSheet) {
-        SelectBottomSheet(
-            options = currentOptions,
-            onSelect = {
-                onSelect(it)
-                showSheet = false
-            },
-            onDismiss = { showSheet = false }
-        )
+        ModalBottomSheet(onDismissRequest = { showSheet = false }) {
+
+            if (selectingColors) {
+                Column(Modifier.padding(16.dp)) {
+
+                    Text("Выбери цвет")
+                    Spacer(Modifier.height(12.dp))
+
+                    colorOptionsRu.forEach { (nameColor, colorValue) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    color = nameColor
+                                    showSheet = false
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(colorValue, shape = CircleShape)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(nameColor)
+                        }
+                    }
+                }
+            } else {
+                SelectBottomSheet(
+                    options = currentOptions,
+                    onSelect = {
+                        onSelect(it)
+                        showSheet = false
+                    },
+                    onDismiss = { showSheet = false }
+                )
+            }
+        }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        userScrollEnabled = !lockScroll
-    ){
+    // ================= MAIN UI =================
+    Scaffold(
 
-        // ================= ЛАСТИК ВМЕСТО AsyncImage =================
-        item {
-            EraserEditor(
-                file = File(currentImagePath),
-                bitmap = editBitmap,
-                onBitmapChange = { editBitmap = it },
-                onSave = { savedFile ->
-                    currentImagePath = savedFile.absolutePath
-                    editBitmap = null
+        bottomBar = {
+            Button(
+                onClick = {
+
+                    val finalFile = File(
+                        File(currentImagePath).parentFile,
+                        "edited_${System.currentTimeMillis()}.png"
+                    )
+
+                    val bitmapToSave =
+                        editBitmap ?: BitmapFactory.decodeFile(currentImagePath)
+
+                    FileOutputStream(finalFile).use {
+                        bitmapToSave.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    }
+
+                    vm.add(
+                        finalFile.absolutePath,
+                        type,
+                        category,
+                        style,
+                        name,
+                        brand,
+                        material,
+                        price,
+                        color
+                    )
+
+                    navController.popBackStack()
                 },
-                onInteractionChange = { lockScroll = it }
-            )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(16.dp)
+            ) {
+                Text("Сохранить")
+            }
         }
 
-        item {
-            Column(modifier = Modifier.padding(16.dp)) {
+    ) { padding ->
 
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Название") },
-                    modifier = Modifier.fillMaxWidth()
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(bottom = 100.dp), // 👈 чтобы не перекрывалось кнопкой
+            userScrollEnabled = !lockScroll
+        ) {
+
+            item {
+                EraserEditor(
+                    file = File(currentImagePath),
+                    bitmap = editBitmap,
+                    onBitmapChange = { editBitmap = it },
+                    onSave = { savedFile ->
+                        currentImagePath = savedFile.absolutePath
+                        editBitmap = null
+                    },
+                    onInteractionChange = { lockScroll = it }
                 )
+            }
 
-                Spacer(Modifier.height(16.dp))
-
-                SectionCard("Категория", Icons.Default.Checkroom) {
-
-                    SelectRow("Тип одежды", type, Icons.Default.Style) {
-                        currentOptions = typeOptionsRu
-                        onSelect = { type = it }
-                        showSheet = true
-                    }
-
-                    SelectRow("Раздел", category, Icons.Default.Category) {
-                        currentOptions = categoryOptionsRu
-                        onSelect = { category = it }
-                        showSheet = true
-                    }
-
-                    SelectRow("Стиль", style, Icons.Default.AutoAwesome) {
-                        currentOptions = styleOptionsRu
-                        onSelect = { style = it }
-                        showSheet = true
-                    }
-
-                    SelectRow("Материал", material, Icons.Default.Texture) {
-                        currentOptions = materialOptionsRu
-                        onSelect = { material = it }
-                        showSheet = true
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                SectionCard("Дополнительно", Icons.Default.Tune) {
+            item {
+                Column(modifier = Modifier.padding(16.dp)) {
 
                     OutlinedTextField(
-                        value = brand,
-                        onValueChange = { brand = it },
-                        label = { Text("Бренд") },
-                        leadingIcon = { Icon(Icons.Default.Business, null) },
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Название") },
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                    OutlinedTextField(
-                        value = tags,
-                        onValueChange = { tags = it },
-                        label = { Text("Теги") },
-                        leadingIcon = { Icon(Icons.Default.Tag, null) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                    SectionCard("Категория", Icons.Default.Checkroom) {
 
-                    Spacer(Modifier.height(8.dp))
-
-                    OutlinedTextField(
-                        value = price,
-                        onValueChange = { price = it },
-                        label = { Text("Цена") },
-                        leadingIcon = { Icon(Icons.Default.Euro, null) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                Spacer(Modifier.height(32.dp))
-
-                Button(
-                    onClick = {
-
-                        val finalFile = File(
-                            File(currentImagePath).parentFile,
-                            "edited_${System.currentTimeMillis()}.png"
-                        )
-
-                        val bitmapToSave = editBitmap
-                            ?: BitmapFactory.decodeFile(currentImagePath)
-
-                        FileOutputStream(finalFile).use {
-                            bitmapToSave.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        SelectRow("Тип одежды", type, Icons.Default.Style) {
+                            selectingColors = false
+                            currentOptions = typeOptionsRu
+                            onSelect = { type = it }
+                            showSheet = true
                         }
 
-                        vm.add(
-                            finalFile.absolutePath,
-                            type,
-                            category,
-                            style,
-                            name
+                        SelectRow("Раздел", category, Icons.Default.Category) {
+                            selectingColors = false
+                            currentOptions = categoryOptionsRu
+                            onSelect = { category = it }
+                            showSheet = true
+                        }
+
+                        SelectRow("Стиль", style, Icons.Default.AutoAwesome) {
+                            selectingColors = false
+                            currentOptions = styleOptionsRu
+                            onSelect = { style = it }
+                            showSheet = true
+                        }
+
+                        SelectRow("Цвет", color, Icons.Default.Palette) {
+                            selectingColors = true
+                            showSheet = true
+                        }
+
+                        SelectRow("Материал", material, Icons.Default.Texture) {
+                            selectingColors = false
+                            currentOptions = materialOptionsRu
+                            onSelect = { material = it }
+                            showSheet = true
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SectionCard("Дополнительно", Icons.Default.Tune) {
+
+                        OutlinedTextField(
+                            value = brand,
+                            onValueChange = { brand = it },
+                            label = { Text("Бренд") },
+                            modifier = Modifier.fillMaxWidth()
                         )
 
-                        navController.popBackStack()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 24.dp)
-                ) {
-                    Text("Сохранить")
+                        Spacer(Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = price,
+                            onValueChange = { price = it },
+                            label = { Text("Цена") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
         }

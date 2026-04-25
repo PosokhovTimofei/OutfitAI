@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ClosetItemEntity::class],
-    version = 2
+    version = 4
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun closetDao(): ClosetDao

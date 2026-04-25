@@ -25,7 +25,11 @@ class ClosetViewModel(
         type: String,
         category: String,
         style: String,
-        label: String
+        label: String,
+        brand: String,
+        material: String,
+        price: String,
+        color: String
     ) {
         viewModelScope.launch {
             repo.addItem(
@@ -35,7 +39,11 @@ class ClosetViewModel(
                     type = type,
                     category = category,
                     style = style,
-                    label = label
+                    label = label,
+                    brand = brand,
+                    material = material,
+                    price = price,
+                    color = color
                 )
             )
         }
@@ -47,6 +55,12 @@ class ClosetViewModel(
             if (file.exists()) file.delete()
 
             repo.deleteItem(item)
+        }
+    }
+
+    fun updateItem(item: ClosetItemEntity) {
+        viewModelScope.launch {
+            repo.updateItem(item)
         }
     }
 }

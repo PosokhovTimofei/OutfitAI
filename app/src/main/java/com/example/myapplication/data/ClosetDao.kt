@@ -3,6 +3,7 @@ package com.example.myapplication.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -16,4 +17,7 @@ interface ClosetDao {
 
     @androidx.room.Delete
     suspend fun delete(item: ClosetItemEntity)
+
+    @Update
+    suspend fun updateItem(item: ClosetItemEntity)
 }

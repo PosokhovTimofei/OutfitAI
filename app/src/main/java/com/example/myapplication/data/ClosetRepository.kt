@@ -11,4 +11,8 @@ class ClosetRepository(
     suspend fun deleteItem(item: ClosetItemEntity) {
         dao.delete(item)
     }
+
+    suspend fun updateItem(item: ClosetItemEntity) {
+        dao.updateItem(item)
+    }
 }

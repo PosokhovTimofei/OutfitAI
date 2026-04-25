@@ -11,5 +11,9 @@ data class ClosetItemEntity(
     val type: String,        // shirt, jeans...
     val category: String,    // top, bottom, shoes, hat
     val style: String,       // streetwear, classic...
-    val label: String        // "Gucci кепка"
+    val label: String,        // "Gucci кепка"
+    val brand: String? = null,
+    val material: String? = null,
+    val price: String? = null,
+    val color: String? = null
 )
