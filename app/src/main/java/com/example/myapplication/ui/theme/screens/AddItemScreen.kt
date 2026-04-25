@@ -42,7 +42,8 @@ fun EraserEditor(
     file: File,
     bitmap: Bitmap?,
     onBitmapChange: (Bitmap) -> Unit,
-    onSave: (File) -> Unit
+    onSave: (File) -> Unit,
+    onInteractionChange: (Boolean) -> Unit
 ) {
     val originalBitmap = remember {
         BitmapFactory.decodeFile(file.absolutePath)
@@ -75,20 +76,12 @@ fun EraserEditor(
 
     Column {
 
-        // =========================
-        // 🖼 РЕДАКТОР (ЗОНА ОГРАНИЧЕНИЯ)
-        // =========================
+        // ===================== IMAGE EDITOR =====================
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(350.dp)
+                .height(500.dp)
                 .clipToBounds()
-
-                // 🔥 ВАЖНО: блокируем скролл LazyColumn
-                .pointerInteropFilter {
-                    true // забираем ВСЕ touch события
-                }
-
                 .pointerInput(Unit) {
 
                     awaitPointerEventScope {
@@ -100,6 +93,8 @@ fun EraserEditor(
 
                             val down = awaitFirstDown(requireUnconsumed = false)
 
+                            onInteractionChange(true) // 🔥 блок скролла
+
                             var isDrawing = false
                             var isTransform = false
                             var startTime = System.currentTimeMillis()
@@ -110,12 +105,12 @@ fun EraserEditor(
                             while (true) {
 
                                 val event = awaitPointerEvent()
-                                val pointers = event.changes
+                                val changes = event.changes
 
-                                // =========================
-                                // 🤏 ZOOM
-                                // =========================
-                                if (pointers.size >= 2) {
+                                if (changes.isEmpty()) break
+
+                                // ================= ZOOM =================
+                                if (changes.size >= 2) {
 
                                     isTransform = true
                                     isDrawing = false
@@ -132,14 +127,14 @@ fun EraserEditor(
 
                                     offset =
                                         (offset - centroid) * scaleChange + centroid + pan
+
                                     scale = newScale
 
-                                    event.changes.forEach { it.consume() } // 🔥 ключ
-
+                                    changes.forEach { it.consume() }
                                     continue
                                 }
 
-                                val change = pointers.first()
+                                val change = changes.first()
 
                                 if (!change.pressed) break
 
@@ -149,11 +144,8 @@ fun EraserEditor(
                                 val timePassed =
                                     System.currentTimeMillis() - startTime
 
-                                // =========================
-                                // 🎯 START DRAW
-                                // =========================
+                                // ================= START DRAW =================
                                 if (!isDrawing && !isTransform) {
-
                                     if (timePassed > drawDelay &&
                                         moveDistance > touchSlop
                                     ) {
@@ -164,9 +156,7 @@ fun EraserEditor(
                                     }
                                 }
 
-                                // =========================
-                                // ✏️ DRAW
-                                // =========================
+                                // ================= DRAW =================
                                 if (isDrawing) {
 
                                     val x =
@@ -196,11 +186,13 @@ fun EraserEditor(
                                         redrawTrigger++
                                     }
 
-                                    change.consume() // 🔥 блокируем scroll
+                                    change.consume()
                                 }
 
                                 lastPos = change.position
                             }
+
+                            onInteractionChange(false) // 🔥 разблок скролла
                         }
                     }
                 }
@@ -251,6 +243,7 @@ fun EraserEditor(
             }
         }
 
+        // ===================== BRUSH SIZE =====================
         Spacer(Modifier.height(12.dp))
 
         Text(
@@ -265,6 +258,7 @@ fun EraserEditor(
             modifier = Modifier.padding(horizontal = 16.dp)
         )
 
+        // ===================== RESET BUTTON =====================
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -326,6 +320,8 @@ fun AddItemScreen(
     var onSelect by remember { mutableStateOf<(String) -> Unit>({}) }
     var showSheet by remember { mutableStateOf(false) }
 
+    var lockScroll by remember { mutableStateOf(false) }
+
     if (showSheet) {
         SelectBottomSheet(
             options = currentOptions,
@@ -338,8 +334,9 @@ fun AddItemScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
-    ) {
+        modifier = Modifier.fillMaxSize(),
+        userScrollEnabled = !lockScroll
+    ){
 
         // ================= ЛАСТИК ВМЕСТО AsyncImage =================
         item {
@@ -350,7 +347,8 @@ fun AddItemScreen(
                 onSave = { savedFile ->
                     currentImagePath = savedFile.absolutePath
                     editBitmap = null
-                }
+                },
+                onInteractionChange = { lockScroll = it }
             )
         }
 
@@ -456,7 +454,7 @@ fun AddItemScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
                 ) {
                     Text("Сохранить")
                 }
