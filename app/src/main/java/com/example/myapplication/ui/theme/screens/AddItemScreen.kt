@@ -2,7 +2,12 @@ package com.example.myapplication.ui.theme.screens
 
 import android.graphics.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +16,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 
@@ -18,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -26,7 +33,7 @@ import androidx.navigation.NavController
 import com.example.myapplication.MyApp
 import java.io.File
 import java.io.FileOutputStream
-
+import androidx.compose.ui.input.pointer.util.*
 // ==========================
 // 🔥 ЛАСТИК
 // ==========================
@@ -41,14 +48,19 @@ fun EraserEditor(
         BitmapFactory.decodeFile(file.absolutePath)
     }
 
-    // 🔥 главный фикс — используем внешний bitmap
-    val workingBitmap = bitmap ?: originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+    var workingBitmap by remember {
+        mutableStateOf(
+            bitmap ?: originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        )
+    }
 
     var brushSize by remember { mutableStateOf(50f) }
     var lastPoint by remember { mutableStateOf<Offset?>(null) }
 
     var scale by remember { mutableStateOf(1f) }
+    var minScale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var initialized by remember { mutableStateOf(false) }
 
     var redrawTrigger by remember { mutableStateOf(0) }
 
@@ -63,68 +75,176 @@ fun EraserEditor(
 
     Column {
 
+        // =========================
+        // 🖼 РЕДАКТОР (ЗОНА ОГРАНИЧЕНИЯ)
+        // =========================
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(350.dp)
-                .pointerInput(bitmap, scale, offset) {
+                .clipToBounds()
 
-                    detectDragGestures(
-                        onDragStart = { touch ->
-                            val bx = (touch.x - offset.x) / scale
-                            val by = (touch.y - offset.y) / scale
-                            lastPoint = Offset(bx, by)
-                        },
+                // 🔥 ВАЖНО: блокируем скролл LazyColumn
+                .pointerInteropFilter {
+                    true // забираем ВСЕ touch события
+                }
 
-                        onDrag = { change, _ ->
+                .pointerInput(Unit) {
 
-                            val canvas = Canvas(workingBitmap)
+                    awaitPointerEventScope {
 
-                            val x = (change.position.x - offset.x) / scale
-                            val y = (change.position.y - offset.y) / scale
+                        val touchSlop = viewConfiguration.touchSlop
+                        val drawDelay = 1L
 
-                            lastPoint?.let {
-                                paint.strokeWidth = brushSize / scale
-                                canvas.drawLine(it.x, it.y, x, y, paint)
+                        while (true) {
+
+                            val down = awaitFirstDown(requireUnconsumed = false)
+
+                            var isDrawing = false
+                            var isTransform = false
+                            var startTime = System.currentTimeMillis()
+                            var lastPos = down.position
+
+                            lastPoint = null
+
+                            while (true) {
+
+                                val event = awaitPointerEvent()
+                                val pointers = event.changes
+
+                                // =========================
+                                // 🤏 ZOOM
+                                // =========================
+                                if (pointers.size >= 2) {
+
+                                    isTransform = true
+                                    isDrawing = false
+                                    lastPoint = null
+
+                                    val zoom = event.calculateZoom()
+                                    val pan = event.calculatePan()
+                                    val centroid = event.calculateCentroid()
+
+                                    val newScale =
+                                        (scale * zoom).coerceIn(minScale, 6f)
+
+                                    val scaleChange = newScale / scale
+
+                                    offset =
+                                        (offset - centroid) * scaleChange + centroid + pan
+                                    scale = newScale
+
+                                    event.changes.forEach { it.consume() } // 🔥 ключ
+
+                                    continue
+                                }
+
+                                val change = pointers.first()
+
+                                if (!change.pressed) break
+
+                                val moveDistance =
+                                    (change.position - lastPos).getDistance()
+
+                                val timePassed =
+                                    System.currentTimeMillis() - startTime
+
+                                // =========================
+                                // 🎯 START DRAW
+                                // =========================
+                                if (!isDrawing && !isTransform) {
+
+                                    if (timePassed > drawDelay &&
+                                        moveDistance > touchSlop
+                                    ) {
+                                        isDrawing = true
+                                    } else {
+                                        lastPos = change.position
+                                        continue
+                                    }
+                                }
+
+                                // =========================
+                                // ✏️ DRAW
+                                // =========================
+                                if (isDrawing) {
+
+                                    val x =
+                                        (change.position.x - offset.x) / scale
+                                    val y =
+                                        (change.position.y - offset.y) / scale
+
+                                    val canvas = Canvas(workingBitmap)
+
+                                    if (lastPoint == null) {
+                                        lastPoint = Offset(x, y)
+                                    } else {
+
+                                        paint.strokeWidth = brushSize / scale
+
+                                        canvas.drawLine(
+                                            lastPoint!!.x,
+                                            lastPoint!!.y,
+                                            x,
+                                            y,
+                                            paint
+                                        )
+
+                                        lastPoint = Offset(x, y)
+
+                                        onBitmapChange(workingBitmap)
+                                        redrawTrigger++
+                                    }
+
+                                    change.consume() // 🔥 блокируем scroll
+                                }
+
+                                lastPos = change.position
                             }
-
-                            lastPoint = Offset(x, y)
-
-                            // 🔥 сохраняем bitmap наружу
-                            onBitmapChange(workingBitmap)
-
-                            redrawTrigger++
-                        },
-
-                        onDragEnd = { lastPoint = null }
-                    )
+                        }
+                    }
                 }
         ) {
 
             key(redrawTrigger) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
 
-                    val imgW = workingBitmap.width.toFloat()
-                    val imgH = workingBitmap.height.toFloat()
+                    if (!initialized) {
 
-                    scale = minOf(
-                        size.width / imgW,
-                        size.height / imgH
-                    )
+                        val imgW = workingBitmap.width.toFloat()
+                        val imgH = workingBitmap.height.toFloat()
 
-                    val drawW = imgW * scale
-                    val drawH = imgH * scale
+                        val fitScale = minOf(
+                            size.width / imgW,
+                            size.height / imgH
+                        )
 
-                    offset = Offset(
-                        (size.width - drawW) / 2f,
-                        (size.height - drawH) / 2f
-                    )
+                        scale = fitScale
+                        minScale = fitScale
+
+                        val drawW = imgW * scale
+                        val drawH = imgH * scale
+
+                        offset = Offset(
+                            (size.width - drawW) / 2f,
+                            (size.height - drawH) / 2f
+                        )
+
+                        initialized = true
+                    }
 
                     drawIntoCanvas { canvas ->
                         canvas.save()
                         canvas.translate(offset.x, offset.y)
                         canvas.scale(scale, scale)
-                        canvas.nativeCanvas.drawBitmap(workingBitmap, 0f, 0f, null)
+
+                        canvas.nativeCanvas.drawBitmap(
+                            workingBitmap,
+                            0f,
+                            0f,
+                            null
+                        )
+
                         canvas.restore()
                     }
                 }
@@ -153,16 +273,18 @@ fun EraserEditor(
         ) {
 
             Button(onClick = {
-                val reset = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
-                onBitmapChange(reset)
+                workingBitmap =
+                    originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+
+                onBitmapChange(workingBitmap)
                 redrawTrigger++
+                initialized = false
             }) {
                 Text("Сброс")
             }
         }
     }
 }
-
 // ==========================
 // 📦 AddItemScreen
 // ==========================
