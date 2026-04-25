@@ -8,10 +8,10 @@ data class ClosetItemEntity(
     @PrimaryKey val id: Long,
     val imageUri: String,
 
-    val type: String,        // shirt, jeans...
-    val category: String,    // top, bottom, shoes, hat
-    val style: String,       // streetwear, classic...
-    val label: String,        // "Gucci кепка"
+    val type: String,
+    val category: String,
+    val style: String,
+    val label: String,
     val brand: String? = null,
     val material: String? = null,
     val price: String? = null,
