@@ -73,4 +73,5 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     kapt("androidx.room:room-compiler:2.8.4")
+    implementation(libs.tensorflow.lite)
 }

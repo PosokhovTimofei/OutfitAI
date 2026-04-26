@@ -19,6 +19,7 @@ coil = "2.6.0"
 retrofitVersion = "2.9.0"
 roomKtx = "2.8.4"
 roomRuntime = "2.8.4"
+tensorflowLite = "2.14.0"
 
 [libraries]
 androidx-activity-compose-v182 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
@@ -50,6 +51,7 @@ converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", ve
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 retrofit-v290 = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofitVersion" }
+tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

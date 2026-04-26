@@ -1,6 +1,7 @@
 package com.example.myapplication.ui.theme.screens
 
 import android.graphics.*
+import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -35,6 +36,8 @@ import com.example.myapplication.MyApp
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.ui.input.pointer.util.*
+import com.example.myapplication.data.TFLiteClassifier
+
 // ==========================
 // 🔥 ЛАСТИК
 // ==========================
@@ -316,6 +319,9 @@ fun AddItemScreen(
 
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptionsRu.first()) }
+
+    var predictionDone by remember { mutableStateOf(false) }
+
     var category by remember { mutableStateOf(categoryOptionsRu.first()) }
     var style by remember { mutableStateOf(styleOptionsRu.first()) }
 
@@ -330,6 +336,36 @@ fun AddItemScreen(
     var showSheet by remember { mutableStateOf(false) }
     var selectingColors by remember { mutableStateOf(false) }
     var lockScroll by remember { mutableStateOf(false) }
+    val classifier = remember {
+        TFLiteClassifier(
+            context,
+            "model.tflite",
+            "labels.txt"
+        )
+    }
+    LaunchedEffect(imagePath) {
+
+        val bitmap = BitmapFactory.decodeFile(imagePath) ?: return@LaunchedEffect
+
+        val result = classifier.classify(bitmap)
+            .trim()
+            .lowercase()
+            .replace(Regex("^\\d+\\s*"), "")
+
+        Log.d("ML_RESULT", result)
+
+        val mapped = when (result) {
+            "джинсы" -> "Джинсы"
+            "рубашка" -> "Рубашка"
+            "футболка" -> "Футболка"
+            "шорты" -> "Шорты"
+            "обувь" -> "Обувь"
+            else -> "Футболка"
+        }
+
+        type = mapped
+    }
+
 
     // ================= BOTTOM SHEET =================
     if (showSheet) {
@@ -507,6 +543,7 @@ fun AddItemScreen(
                             label = { Text("Цена") },
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Log.d("ML_CHECK", "type=$type")
                     }
                 }
             }
