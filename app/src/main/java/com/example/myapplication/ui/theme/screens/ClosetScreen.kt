@@ -3,10 +3,17 @@ package com.example.myapplication.ui.theme.screens
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material.icons.Icons
@@ -14,6 +21,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -28,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.example.myapplication.data.ClosetItemEntity
 
 @Composable
 fun ClosetScreen(
@@ -49,6 +59,12 @@ fun ClosetScreen(
     val items by vm.items.collectAsState()
 
     var tempUri by remember { mutableStateOf<Uri?>(null) }
+
+    // 🔥 selection
+    var selectedItems by remember { mutableStateOf<List<ClosetItemEntity>>(emptyList()) }
+    var outfitBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val isSelectionMode = selectedItems.isNotEmpty()
 
     // ================= CAMERA =================
     val cameraLauncher =
@@ -104,29 +120,49 @@ fun ClosetScreen(
 
             items(items, key = { it.id }) { item ->
 
+                val isSelected = selectedItems.contains(item)
+
                 Card(
-                    onClick = { navController.navigate("detail/${item.id}") },
-                    modifier = Modifier.aspectRatio(1f)
+                    modifier = Modifier
+                        .aspectRatio(1f)
+                        .then(
+                            if (isSelected)
+                                Modifier.border(3.dp, MaterialTheme.colorScheme.primary)
+                            else Modifier
+                        )
                 ) {
 
-                    Box(Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .combinedClickable(
 
-                        Column {
+                                // ОДИН КЛИК
+                                onClick = {
+                                    if (isSelectionMode) {
+                                        toggleSelect(item, selectedItems) {
+                                            selectedItems = it
+                                        }
+                                    } else {
+                                        navController.navigate("detail/${item.id}")
+                                    }
+                                },
 
-                            AsyncImage(
-                                model = item.imageUri,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
+                                // ДОЛГОЕ НАЖАТИЕ → включаем режим выбора
+                                onLongClick = {
+                                    toggleSelect(item, selectedItems) {
+                                        selectedItems = it
+                                    }
+                                }
                             )
+                    ) {
 
-                            Text(
-                                text = item.label.ifEmpty { "Без названия" },
-                                modifier = Modifier.padding(6.dp)
-                            )
-                        }
+                        AsyncImage(
+                            model = item.imageUri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
 
                         IconButton(
                             onClick = { vm.delete(item) },
@@ -137,6 +173,61 @@ fun ClosetScreen(
                     }
                 }
             }
+        }
+
+        // ================= CREATE BUTTON (ПОДСВЕТКА + ВЫШЕ) =================
+        if (selectedItems.size == 3) {
+
+            // затемнение фона
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+            )
+
+            Button(
+                onClick = {
+                    outfitBitmap = createOutfit(selectedItems)
+                },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth(0.9f)
+                    .height(70.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("✨ Создать образ")
+            }
+        }
+
+        // ================= POPUP =================
+        if (outfitBitmap != null) {
+
+            AlertDialog(
+                onDismissRequest = { outfitBitmap = null },
+                confirmButton = {
+                    Button(onClick = {
+                        outfitBitmap = null
+                        selectedItems = emptyList()
+                    }) {
+                        Text("Добавить образ")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { outfitBitmap = null }) {
+                        Text("Закрыть")
+                    }
+                },
+                text = {
+                    Image(
+                        bitmap = outfitBitmap!!.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            )
         }
 
         // ================= BUTTONS =================
@@ -222,4 +313,42 @@ private fun processImage(
 
         onLoading(false)
     }
+}
+
+fun toggleSelect(
+    item: ClosetItemEntity,
+    current: List<ClosetItemEntity>,
+    update: (List<ClosetItemEntity>) -> Unit
+) {
+    val list = current.toMutableList()
+
+    if (list.contains(item)) {
+        list.remove(item)
+    } else if (list.size < 3) {
+        list.add(item)
+    }
+
+    update(list)
+}
+
+fun createOutfit(items: List<ClosetItemEntity>): Bitmap {
+
+    val bitmaps = items.mapNotNull {
+        BitmapFactory.decodeFile(it.imageUri)
+    }
+
+    val width = bitmaps.maxOf { it.width }
+    val height = bitmaps.sumOf { it.height }
+
+    val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(result)
+
+    var top = 0
+
+    bitmaps.forEach {
+        canvas.drawBitmap(it, 0f, top.toFloat(), null)
+        top += it.height
+    }
+
+    return result
 }
