@@ -314,13 +314,16 @@ fun AddItemScreen(
         "Желтый" to androidx.compose.ui.graphics.Color(0xFFFFEB3B)
     )
 
+    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var editBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var typeLocked by remember { mutableStateOf(false) }
+
     var currentImagePath by remember { mutableStateOf(imagePath) }
 
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(typeOptionsRu.first()) }
 
-    var predictionDone by remember { mutableStateOf(false) }
+
 
     var category by remember { mutableStateOf(categoryOptionsRu.first()) }
     var style by remember { mutableStateOf(styleOptionsRu.first()) }
@@ -343,18 +346,27 @@ fun AddItemScreen(
             "labels.txt"
         )
     }
+    var predictionDone by remember { mutableStateOf(false) }
+
     LaunchedEffect(imagePath) {
 
-        val bitmap = BitmapFactory.decodeFile(imagePath) ?: return@LaunchedEffect
+        if (typeLocked) return@LaunchedEffect
 
-        val result = classifier.classify(bitmap)
+        val bmp = BitmapFactory.decodeFile(imagePath)
+            ?: return@LaunchedEffect
+
+        originalBitmap = bmp
+
+        Log.d("ML_DEBUG", "CLASSIFY FROM ORIGINAL ONLY")
+
+        val result = classifier.classify(bmp)
             .trim()
-            .lowercase()
             .replace(Regex("^\\d+\\s*"), "")
+            .lowercase()
 
         Log.d("ML_RESULT", result)
 
-        val mapped = when (result) {
+        type = when (result) {
             "джинсы" -> "Джинсы"
             "рубашка" -> "Рубашка"
             "футболка" -> "Футболка"
@@ -363,7 +375,7 @@ fun AddItemScreen(
             else -> "Футболка"
         }
 
-        type = mapped
+        typeLocked = true
     }
 
 
