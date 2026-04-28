@@ -30,4 +30,8 @@ class ClosetRepository(
     suspend fun deleteOutfit(outfit: OutfitEntity) {
         dao.deleteOutfit(outfit)
     }
+
+    suspend fun updateOutfit(outfit: OutfitEntity){
+        dao.updateOutfit(outfit)
+    }
 }

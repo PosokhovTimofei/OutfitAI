@@ -27,7 +27,9 @@ fun MainScreen(
                 modifier = Modifier.padding(padding)
             )
             2 -> GenerateOutfitScreen(Modifier.padding(padding))
-            3 -> FavoritesScreen(Modifier.padding(padding))
+            3 -> FavoritesScreen(
+                navController = navController,
+                Modifier.padding(padding))
             4 -> ProfileScreen(Modifier.padding(padding))
         }
     }

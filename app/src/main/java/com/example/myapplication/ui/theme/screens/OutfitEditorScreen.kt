@@ -27,7 +27,6 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
-// ================= STATE =================
 data class OutfitItemState(
     val itemId: Long,
     val x: Float,
@@ -35,7 +34,6 @@ data class OutfitItemState(
     val scale: Float
 )
 
-// ================= SCREEN =================
 @Composable
 fun OutfitEditorScreen(
     itemIds: String,
@@ -64,133 +62,110 @@ fun OutfitEditorScreen(
 
     val itemStates = remember { mutableStateListOf<OutfitItemState>() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.75f)
+            .background(Color.White)
+    ) {
 
-        // ================= CANVAS =================
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.75f)
-                .background(Color.White)
-        ) {
+        selectedItems.forEach { item ->
 
-            selectedItems.forEach { item ->
+            var x by remember { mutableStateOf(300f) }
+            var y by remember { mutableStateOf(300f) }
+            var scale by remember { mutableStateOf(1f) }
 
-                val (startX, startY) = when (item.category) {
-                    "Верх" -> 300f to 200f
-                    "Низ" -> 300f to 600f
-                    "Обувь" -> 300f to 900f
-                    else -> 300f to 500f
-                }
+            val painter = rememberAsyncImagePainter(
+                model = ImageRequest.Builder(context)
+                    .data(item.imageUri)
+                    .allowHardware(false)
+                    .build()
+            )
 
-                DraggableItem(
-                    item = item,
-                    startX = startX,
-                    startY = startY,
-                    onStateChange = { state ->
-                        itemStates.removeAll { it.itemId == state.itemId }
-                        itemStates.add(state)
-                    }
+            fun emit() {
+                itemStates.removeAll { it.itemId == item.id }
+                itemStates.add(
+                    OutfitItemState(item.id, x, y, scale)
                 )
             }
-        }
 
-        // ================= BUTTONS =================
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-
-                    scope.launch {
-
-                        val bitmap = view.drawToBitmap()
-
-                        val file = File(
-                            context.cacheDir,
-                            "outfit_${System.currentTimeMillis()}.png"
-                        )
-
-                        FileOutputStream(file).use {
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                        }
-
-                        vm.saveOutfit(
-                            itemIds = idList,
-                            states = itemStates,
-                            previewUri = file.absolutePath
-                        )
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .size(220.dp)
+                    .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
                     }
-                }
-            ) {
-                Text("💾 Сохранить образ")
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { navController.popBackStack() }
-            ) {
-                Text("⬅ Назад")
-            }
+                    .pointerInput(item.id) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(0.6f, 2.5f)
+                            x += pan.x
+                            y += pan.y
+                            emit()
+                        }
+                    }
+            )
         }
     }
-}
 
-// ================= ITEM =================
-@Composable
-fun DraggableItem(
-    item: ClosetItemEntity,
-    startX: Float,
-    startY: Float,
-    onStateChange: (OutfitItemState) -> Unit
-) {
-
-    var offsetX by remember(item.id) { mutableStateOf(startX) }
-    var offsetY by remember(item.id) { mutableStateOf(startY) }
-    var scale by remember(item.id) { mutableStateOf(1f) }
-
-    val painter = rememberAsyncImagePainter(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(item.imageUri)
-            .allowHardware(false) // 🔥 фикс краша
-            .build()
-    )
-
-    fun emit() {
-        onStateChange(
-            OutfitItemState(item.id, offsetX, offsetY, scale)
-        )
-    }
-
-    Image(
-        painter = painter,
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
+    Column(
         modifier = Modifier
-            .size(220.dp)
-            .offset {
-                IntOffset(offsetX.roundToInt(), offsetY.roundToInt())
-            }
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .pointerInput(item.id) {
-                detectTransformGestures { _, pan, zoom, _ ->
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.Bottom
+    ) {
 
-                    scale = (scale * zoom).coerceIn(0.6f, 2.5f)
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
 
-                    offsetX += pan.x
-                    offsetY += pan.y
+                scope.launch {
 
-                    emit()
+                    // 🔥 1. СКРИН ТОЛЬКО КАНВАСА
+                    val full = view.drawToBitmap()
+
+                    val croppedHeight = (full.height * 0.75f).toInt()
+
+                    val cropped = Bitmap.createBitmap(
+                        full,
+                        0,
+                        0,
+                        full.width,
+                        croppedHeight
+                    )
+
+                    val file = File(
+                        context.cacheDir,
+                        "outfit_${System.currentTimeMillis()}.png"
+                    )
+
+                    FileOutputStream(file).use {
+                        cropped.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    }
+
+                    // 🔥 2. СОХРАНЯЕМ:
+                    vm.saveOutfit(
+                        itemIds = idList,
+                        states = itemStates,
+                        previewUri = file.absolutePath // <- ЭТО ИДЕТ В FAVORITES
+                    )
                 }
             }
-    )
+        ) {
+            Text("💾 Сохранить образ")
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { navController.popBackStack() }
+        ) {
+            Text("⬅ Назад")
+        }
+    }
 }

@@ -1,22 +1,30 @@
 package com.example.myapplication.ui.theme.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.MyApp
 
 @Composable
-fun FavoritesScreen(modifier: Modifier = Modifier) {
+fun FavoritesScreen(
+    navController: NavController,
+    modifier: Modifier = Modifier
+) {
 
     val context = LocalContext.current
 
@@ -47,7 +55,6 @@ fun FavoritesScreen(modifier: Modifier = Modifier) {
 
         } else {
 
-            // ================= GRID =================
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 contentPadding = PaddingValues(10.dp),
@@ -60,56 +67,52 @@ fun FavoritesScreen(modifier: Modifier = Modifier) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(0.5f) // 🔥 ВСЕ КАРТОЧКИ ОДИНАКОВЫЕ (vertical fashion style)
+                            .aspectRatio(0.5f)
                     ) {
 
-                        Column {
+                        Box(modifier = Modifier.fillMaxSize()) {
 
-                            // ================= IMAGE =================
-                            Box(
+                            Column(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxSize()
+                                    .clickable {
+                                        navController.navigate("outfit_view/${outfit.id}")
+                                    }
                             ) {
 
-                                if (!outfit.previewUri.isNullOrEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
 
-                                    AsyncImage(
-                                        model = outfit.previewUri,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,      // 🔥 ОБРЕЗКА
-                                        alignment = Alignment.TopCenter,       // 🔥 РЕЖЕМ СНИЗУ
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(300.dp)
-                                    )
+                                    if (!outfit.previewUri.isNullOrEmpty()) {
 
-                                } else {
+                                        AsyncImage(
+                                            model = outfit.previewUri,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            alignment = Alignment.TopCenter,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
 
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("No preview")
                                     }
                                 }
                             }
 
-                            // ================= INFO =================
-                            Column(
-                                modifier = Modifier.padding(6.dp)
+                            IconButton(
+                                onClick = {
+                                    vm.deleteOutfit(outfit)
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
                             ) {
-
-                                Text(
-                                    text = "Outfit #${outfit.id}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1
-                                )
-
-                                Text(
-                                    text = "${outfit.itemIds.split(",").size} items",
-                                    style = MaterialTheme.typography.labelSmall
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Удалить",
+                                    tint = Color.Black
                                 )
                             }
                         }

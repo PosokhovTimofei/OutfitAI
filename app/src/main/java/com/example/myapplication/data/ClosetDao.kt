@@ -34,4 +34,7 @@ interface ClosetDao {
 
     @Delete
     suspend fun deleteOutfit(outfit: OutfitEntity)
+
+    @Update
+    suspend fun updateOutfit(outfit: OutfitEntity)
 }

@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.google.gson.Gson
-import com.example.myapplication.ui.theme.screens.OutfitItemState
+
 
 
 class ClosetViewModel(
@@ -89,6 +89,18 @@ class ClosetViewModel(
                     createdAt = System.currentTimeMillis()
                 )
             )
+        }
+    }
+
+    fun updateOutfit(outfit: OutfitEntity) {
+        viewModelScope.launch {
+            repo.updateOutfit(outfit)
+        }
+    }
+
+    fun deleteOutfit(outfit: OutfitEntity) {
+        viewModelScope.launch {
+            repo.deleteOutfit(outfit)
         }
     }
 }

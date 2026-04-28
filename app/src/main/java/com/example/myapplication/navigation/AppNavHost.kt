@@ -78,5 +78,17 @@ fun AppNavHost() {
                 navController = navController
             )
         }
+
+        composable("outfit_view/{id}") { backStackEntry ->
+
+            val id = backStackEntry.arguments
+                ?.getString("id")
+                ?.toLongOrNull() ?: return@composable
+
+            OutfitViewScreen(
+                outfitId = id,
+                navController = navController
+            )
+        }
     }
 }
