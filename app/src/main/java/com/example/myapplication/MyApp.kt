@@ -9,7 +9,7 @@ class MyApp : Application() {
 
     val database by lazy {
         Room.databaseBuilder(
-            this, // ✅ ВОТ ТУТ ИСПРАВЛЕНО
+            this,
             AppDatabase::class.java,
             "closet_db"
         )

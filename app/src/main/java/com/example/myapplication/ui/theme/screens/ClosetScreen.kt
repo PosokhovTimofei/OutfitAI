@@ -62,8 +62,6 @@ fun ClosetScreen(
 
     // 🔥 selection
     var selectedItems by remember { mutableStateOf<List<ClosetItemEntity>>(emptyList()) }
-    var outfitBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
     val isSelectionMode = selectedItems.isNotEmpty()
 
     // ================= CAMERA =================
@@ -148,7 +146,7 @@ fun ClosetScreen(
                                     }
                                 },
 
-                                // ДОЛГОЕ НАЖАТИЕ → включаем режим выбора
+                                // ДОЛГОЕ НАЖАТИЕ → старт выбора
                                 onLongClick = {
                                     toggleSelect(item, selectedItems) {
                                         selectedItems = it
@@ -175,10 +173,10 @@ fun ClosetScreen(
             }
         }
 
-        // ================= CREATE BUTTON (ПОДСВЕТКА + ВЫШЕ) =================
+        // ================= CREATE BUTTON =================
         if (selectedItems.size == 3) {
 
-            // затемнение фона
+            // затемнение
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -187,47 +185,19 @@ fun ClosetScreen(
 
             Button(
                 onClick = {
-                    outfitBitmap = createOutfit(selectedItems)
+                    val encoded = selectedItems.joinToString(",") {
+                        it.id.toString()
+                    }
+
+                    navController.navigate("outfit_editor/$encoded")
                 },
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth(0.9f)
-                    .height(70.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                    .height(70.dp)
             ) {
-                Text("✨ Создать образ")
+                Text("✨ Редактировать образ")
             }
-        }
-
-        // ================= POPUP =================
-        if (outfitBitmap != null) {
-
-            AlertDialog(
-                onDismissRequest = { outfitBitmap = null },
-                confirmButton = {
-                    Button(onClick = {
-                        outfitBitmap = null
-                        selectedItems = emptyList()
-                    }) {
-                        Text("Добавить образ")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { outfitBitmap = null }) {
-                        Text("Закрыть")
-                    }
-                },
-                text = {
-                    Image(
-                        bitmap = outfitBitmap!!.asImageBitmap(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentScale = ContentScale.Fit
-                    )
-                }
-            )
         }
 
         // ================= BUTTONS =================
@@ -331,24 +301,3 @@ fun toggleSelect(
     update(list)
 }
 
-fun createOutfit(items: List<ClosetItemEntity>): Bitmap {
-
-    val bitmaps = items.mapNotNull {
-        BitmapFactory.decodeFile(it.imageUri)
-    }
-
-    val width = bitmaps.maxOf { it.width }
-    val height = bitmaps.sumOf { it.height }
-
-    val result = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(result)
-
-    var top = 0
-
-    bitmaps.forEach {
-        canvas.drawBitmap(it, 0f, top.toFloat(), null)
-        top += it.height
-    }
-
-    return result
-}

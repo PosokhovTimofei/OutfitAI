@@ -2,7 +2,9 @@ package com.example.myapplication
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.*
+import androidx.navigation.navArgument
 import com.example.myapplication.ui.theme.screens.*
 
 @Composable
@@ -58,6 +60,21 @@ fun AppNavHost() {
 
             EditorScreen(
                 itemId = itemId,
+                navController = navController
+            )
+        }
+
+        composable(
+            route = "outfit_editor/{ids}",
+            arguments = listOf(
+                navArgument("ids") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val ids = backStackEntry.arguments?.getString("ids") ?: ""
+
+            OutfitEditorScreen(
+                itemIds = ids,
                 navController = navController
             )
         }
