@@ -1,5 +1,7 @@
 package com.example.myapplication.ui.theme.screens
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -10,18 +12,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.view.drawToBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
+import coil.request.ImageRequest
 import com.example.myapplication.MyApp
 import com.example.myapplication.data.ClosetItemEntity
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
+// ================= STATE =================
+data class OutfitItemState(
+    val itemId: Long,
+    val x: Float,
+    val y: Float,
+    val scale: Float
+)
+
+// ================= SCREEN =================
 @Composable
 fun OutfitEditorScreen(
     itemIds: String,
@@ -29,6 +43,8 @@ fun OutfitEditorScreen(
 ) {
 
     val context = LocalContext.current
+    val view = LocalView.current
+    val scope = rememberCoroutineScope()
 
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
@@ -46,66 +62,70 @@ fun OutfitEditorScreen(
         items.filter { it.id in idList }
     }
 
-    val density = LocalDensity.current
+    val itemStates = remember { mutableStateListOf<OutfitItemState>() }
 
-    val screenW = with(density) {
-        LocalConfiguration.current.screenWidthDp.dp.toPx()
-    }
-
-    val screenH = with(density) {
-        LocalConfiguration.current.screenHeightDp.dp.toPx()
-    }
-
-    val bottomBarHeightPx = with(density) {
-        250.dp.toPx()
-    }
-
-    val canvasHeight = screenH - bottomBarHeightPx
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFEEEEEE))
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
 
         // ================= CANVAS =================
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .fillMaxHeight(0.75f)
                 .background(Color.White)
-        )
+        ) {
 
-        // ================= ITEMS =================
-        selectedItems.forEach { item ->
+            selectedItems.forEach { item ->
 
-            val (startX, startY) = when (item.category) {
-                "Верх" -> screenW / 2f to 200f
-                "Низ" -> screenW / 2f to 600f
-                "Обувь" -> screenW / 2f to 1000f
-                else -> screenW / 2f to 500f
+                val (startX, startY) = when (item.category) {
+                    "Верх" -> 300f to 200f
+                    "Низ" -> 300f to 600f
+                    "Обувь" -> 300f to 900f
+                    else -> 300f to 500f
+                }
+
+                DraggableItem(
+                    item = item,
+                    startX = startX,
+                    startY = startY,
+                    onStateChange = { state ->
+                        itemStates.removeAll { it.itemId == state.itemId }
+                        itemStates.add(state)
+                    }
+                )
             }
-
-            DraggableZoomableItem(
-                item = item,
-                startX = startX,
-                startY = startY,
-                screenW = screenW,
-                screenH = canvasHeight
-            )
         }
 
         // ================= BUTTONS =================
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
                 .padding(16.dp)
         ) {
 
             Button(
+                modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    // TODO сохранить образ
-                },
-                modifier = Modifier.fillMaxWidth()
+
+                    scope.launch {
+
+                        val bitmap = view.drawToBitmap()
+
+                        val file = File(
+                            context.cacheDir,
+                            "outfit_${System.currentTimeMillis()}.png"
+                        )
+
+                        FileOutputStream(file).use {
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                        }
+
+                        vm.saveOutfit(
+                            itemIds = idList,
+                            states = itemStates,
+                            previewUri = file.absolutePath
+                        )
+                    }
+                }
             ) {
                 Text("💾 Сохранить образ")
             }
@@ -113,8 +133,8 @@ fun OutfitEditorScreen(
             Spacer(Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { navController.popBackStack() }
             ) {
                 Text("⬅ Назад")
             }
@@ -122,39 +142,46 @@ fun OutfitEditorScreen(
     }
 }
 
+// ================= ITEM =================
 @Composable
-fun DraggableZoomableItem(
+fun DraggableItem(
     item: ClosetItemEntity,
     startX: Float,
     startY: Float,
-    screenW: Float,
-    screenH: Float
+    onStateChange: (OutfitItemState) -> Unit
 ) {
 
     var offsetX by remember(item.id) { mutableStateOf(startX) }
     var offsetY by remember(item.id) { mutableStateOf(startY) }
     var scale by remember(item.id) { mutableStateOf(1f) }
 
-    val baseSize = 220f
+    val painter = rememberAsyncImagePainter(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(item.imageUri)
+            .allowHardware(false) // 🔥 фикс краша
+            .build()
+    )
 
-    AsyncImage(
-        model = item.imageUri,
+    fun emit() {
+        onStateChange(
+            OutfitItemState(item.id, offsetX, offsetY, scale)
+        )
+    }
+
+    Image(
+        painter = painter,
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = Modifier
             .size(220.dp)
             .offset {
-                IntOffset(
-                    offsetX.roundToInt(),
-                    offsetY.roundToInt()
-                )
+                IntOffset(offsetX.roundToInt(), offsetY.roundToInt())
             }
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
             .pointerInput(item.id) {
-
                 detectTransformGestures { _, pan, zoom, _ ->
 
                     scale = (scale * zoom).coerceIn(0.6f, 2.5f)
@@ -162,14 +189,7 @@ fun DraggableZoomableItem(
                     offsetX += pan.x
                     offsetY += pan.y
 
-                    val size = baseSize * scale
-
-                    // 🔥 ОГРАНИЧЕНИЕ ТОЛЬКО СПРАВА И СНИЗУ
-                    val maxX = screenW - size
-                    val maxY = screenH - size
-
-                    offsetX = offsetX.coerceAtMost(maxX)
-                    offsetY = offsetY.coerceAtMost(maxY)
+                    emit()
                 }
             }
     )

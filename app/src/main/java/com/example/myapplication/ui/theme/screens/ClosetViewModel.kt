@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.data.ClosetRepository
 import com.example.myapplication.data.ClosetItemEntity
+import com.example.myapplication.data.OutfitEntity
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.google.gson.Gson
+import com.example.myapplication.ui.theme.screens.OutfitItemState
+
 
 class ClosetViewModel(
     private val repo: ClosetRepository
@@ -61,6 +65,30 @@ class ClosetViewModel(
     fun updateItem(item: ClosetItemEntity) {
         viewModelScope.launch {
             repo.updateItem(item)
+        }
+    }
+
+    val outfits = repo.getOutfits()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun saveOutfit(
+        itemIds: List<Long>,
+        states: List<OutfitItemState>,
+        previewUri: String?
+    ) {
+        viewModelScope.launch {
+
+            val json = Gson().toJson(states)
+
+            repo.addOutfit(
+                OutfitEntity(
+                    id = System.currentTimeMillis(),
+                    itemIds = itemIds.joinToString(","),
+                    layoutJson = json,
+                    previewUri = previewUri,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
         }
     }
 }
