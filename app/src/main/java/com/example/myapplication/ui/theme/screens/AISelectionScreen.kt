@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 
 // ================= STATE =================
 
@@ -49,19 +51,18 @@ fun GenerateOutfitScreen(
 
     val items by vm.items.collectAsState(initial = emptyList())
 
-    var style by remember { mutableStateOf("") }
-    var event by remember { mutableStateOf("") }
+    val styles = listOf("Кэжуал", "Спорт", "Офис", "Вечеринка")
+    val events = listOf("Прогулка", "Работа", "Свидание", "Тренировка")
+
+    var style by remember { mutableStateOf("Кэжуал") }
+    var event by remember { mutableStateOf("Прогулка") }
 
     val outfitItems = remember { mutableStateListOf<DraggableItem>() }
     var isCreated by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
+    Box(modifier = modifier.fillMaxSize()) {
 
-    ) {
-
-        // ===================== INPUT MODE =====================
+        // ================= INPUT =================
         if (!isCreated) {
 
             Column(
@@ -70,13 +71,11 @@ fun GenerateOutfitScreen(
                     .padding(24.dp)
             ) {
 
-                SmallField("Погода", "🌧 Дождь, +12°C", enabled = false)
+                DropdownField("Стиль", styles, style) { style = it }
+
                 Spacer(Modifier.height(12.dp))
 
-                SmallField("Стиль", style) { style = it }
-                Spacer(Modifier.height(12.dp))
-
-                SmallField("Мероприятие", event) { event = it }
+                DropdownField("Мероприятие", events, event) { event = it }
 
                 Spacer(Modifier.height(20.dp))
 
@@ -86,9 +85,62 @@ fun GenerateOutfitScreen(
                         .height(60.dp),
                     onClick = {
 
-                        val tops = items.filter { it.category.contains("верх", true) }
-                        val bottoms = items.filter { it.category.contains("низ", true) }
-                        val shoes = items.filter { it.category.contains("обув", true) }
+                        // ================= STYLE FILTER =================
+                        val styleFiltered = items.filter { item ->
+                            when (style) {
+                                "Кэжуал" -> true
+                                "Спорт" -> item.type.contains("Кроссовки", true)
+                                "Офис" -> item.type.contains("Рубашка", true) || item.type.contains("Джинсы", true)
+                                "Вечеринка" -> true
+                                else -> true
+                            }
+                        }
+
+                        val base = if (styleFiltered.isEmpty()) items else styleFiltered
+
+                        // ================= DRESS MODE =================
+                        val dresses = base.filter {
+                            it.type.equals("Платье", true)
+                        }
+
+                        if (dresses.isNotEmpty()) {
+
+                            val dress = dresses.random()
+
+                            val shoes = base.filter {
+                                it.type.equals("Кроссовки", true)
+                            }
+
+                            if (shoes.isNotEmpty()) {
+
+                                outfitItems.clear()
+
+                                outfitItems.addAll(
+                                    listOf(
+                                        DraggableItem(dress, Offset(120f, 120f)),
+                                        DraggableItem(shoes.random(), Offset(140f, 380f))
+                                    )
+                                )
+
+                                isCreated = true
+                                return@Button
+                            }
+                        }
+
+                        // ================= NORMAL MODE =================
+                        val tops = base.filter {
+                            it.type.equals("Футболка", true) ||
+                                    it.type.equals("Рубашка", true)
+                        }
+
+                        val bottoms = base.filter {
+                            it.type.equals("Джинсы", true) ||
+                                    it.type.equals("Шорты", true)
+                        }
+
+                        val shoes = base.filter {
+                            it.type.equals("Кроссовки", true)
+                        }
 
                         if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoes.isNotEmpty()) {
 
@@ -111,15 +163,15 @@ fun GenerateOutfitScreen(
             }
         }
 
-        // ===================== EDITOR MODE =====================
+        // ================= EDITOR =================
         if (isCreated) {
 
-            // 🔥 ОБРАЗ (центр экрана)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(bottom = 140.dp) // место под кнопки
+                    .padding(bottom = 140.dp)
             ) {
+
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -127,22 +179,18 @@ fun GenerateOutfitScreen(
                         .height(500.dp)
                         .background(androidx.compose.ui.graphics.Color.White)
                 ) {
-                    outfitItems.forEach { item ->
-                        DraggableImage(item)
+
+                    outfitItems.forEach {
+                        DraggableImage(it)
                     }
                 }
             }
 
-            // ===================== FIXED BOTTOM BUTTONS =====================
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = 0.dp // 👈 меньше отступ = ниже кнопки
-                    ),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
 
@@ -152,16 +200,14 @@ fun GenerateOutfitScreen(
 
                         scope.launch {
 
-                            val fullBitmap = view.drawToBitmap()
+                            val bitmap = view.drawToBitmap()
 
-                            val croppedHeight = (fullBitmap.height * 0.72f).toInt()
-
-                            val croppedBitmap = Bitmap.createBitmap(
-                                fullBitmap,
+                            val cropped = Bitmap.createBitmap(
+                                bitmap,
                                 0,
                                 0,
-                                fullBitmap.width,
-                                croppedHeight
+                                bitmap.width,
+                                (bitmap.height * 0.70f).toInt()
                             )
 
                             val file = File(
@@ -170,7 +216,7 @@ fun GenerateOutfitScreen(
                             )
 
                             FileOutputStream(file).use {
-                                croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                                cropped.compress(Bitmap.CompressFormat.PNG, 100, it)
                             }
 
                             vm.saveOutfit(
@@ -243,20 +289,47 @@ fun DraggableImage(dragItem: DraggableItem) {
 
 // ================= FIELD =================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SmallField(
+fun DropdownField(
     label: String,
-    value: String,
-    enabled: Boolean = true,
-    onChange: (String) -> Unit = {}
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        enabled = enabled,
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) },
-        shape = RoundedCornerShape(10.dp)
-    )
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+
+        OutlinedTextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
