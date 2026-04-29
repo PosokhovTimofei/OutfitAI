@@ -14,9 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.*
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.drawToBitmap
@@ -27,7 +25,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
-import com.example.myapplication.ui.theme.screens.OutfitEditorScreen
 
 // ================= STATE =================
 
@@ -36,17 +33,13 @@ data class DraggableItem(
     var offset: Offset = Offset(100f, 100f)
 )
 
-
 @Composable
 fun GenerateOutfitScreen(
     modifier: Modifier = Modifier
 ) {
-    val focusManager = LocalFocusManager.current
-    val context = LocalContext.current
     val view = LocalView.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    val scrollState = rememberScrollState()
 
     val vm: ClosetViewModel = viewModel(
         factory = ClosetViewModelFactory(
@@ -59,174 +52,158 @@ fun GenerateOutfitScreen(
     var style by remember { mutableStateOf("") }
     var event by remember { mutableStateOf("") }
 
-    val weather = "🌧 Дождь, +12°C"
-
     val outfitItems = remember { mutableStateListOf<DraggableItem>() }
-
     var isCreated by remember { mutableStateOf(false) }
-    var scrollToBottom by remember { mutableStateOf(false) }
 
-    // ================= SCROLL =================
-
-    LaunchedEffect(scrollToBottom) {
-        if (scrollToBottom) {
-            scrollState.animateScrollTo(scrollState.maxValue)
-            scrollToBottom = false
-        }
-    }
-
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .pointerInput(Unit) {
-                detectTapGestures {
-                    focusManager.clearFocus()
-                }
-            }
-            .padding(24.dp),
+
     ) {
 
-        // ================= INPUT MODE =================
-
+        // ===================== INPUT MODE =====================
         if (!isCreated) {
 
-            SmallField("Погода", weather, enabled = false)
-            Spacer(Modifier.height(12.dp))
-
-            SmallField("Стиль", style) { style = it }
-            Spacer(Modifier.height(12.dp))
-
-            SmallField("Мероприятие", event) { event = it }
-
-            Spacer(Modifier.height(20.dp))
-
-            Button(
-                onClick = {
-
-                    val tops = items.filter { it.category.contains("верх", true) }
-                    val bottoms = items.filter { it.category.contains("низ", true) }
-                    val shoesList = items.filter { it.category.contains("обув", true) }
-
-                    if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoesList.isNotEmpty()) {
-
-                        outfitItems.clear()
-
-                        outfitItems.addAll(
-                            listOf(
-                                DraggableItem(tops.random(), Offset(100f, 50f)),
-                                DraggableItem(bottoms.random(), Offset(120f, 220f)),
-                                DraggableItem(shoesList.random(), Offset(140f, 380f))
-                            )
-                        )
-
-                        isCreated = true
-                        scrollToBottom = true
-                    }
-                },
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
+                    .fillMaxSize()
+                    .padding(24.dp)
             ) {
-                Text("Создать образ")
+
+                SmallField("Погода", "🌧 Дождь, +12°C", enabled = false)
+                Spacer(Modifier.height(12.dp))
+
+                SmallField("Стиль", style) { style = it }
+                Spacer(Modifier.height(12.dp))
+
+                SmallField("Мероприятие", event) { event = it }
+
+                Spacer(Modifier.height(20.dp))
+
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp),
+                    onClick = {
+
+                        val tops = items.filter { it.category.contains("верх", true) }
+                        val bottoms = items.filter { it.category.contains("низ", true) }
+                        val shoes = items.filter { it.category.contains("обув", true) }
+
+                        if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoes.isNotEmpty()) {
+
+                            outfitItems.clear()
+
+                            outfitItems.addAll(
+                                listOf(
+                                    DraggableItem(tops.random(), Offset(100f, 50f)),
+                                    DraggableItem(bottoms.random(), Offset(120f, 220f)),
+                                    DraggableItem(shoes.random(), Offset(140f, 380f))
+                                )
+                            )
+
+                            isCreated = true
+                        }
+                    }
+                ) {
+                    Text("Создать образ")
+                }
             }
         }
 
-        // ================= EDITOR MODE =================
-
+        // ===================== EDITOR MODE =====================
         if (isCreated) {
 
-            Spacer(Modifier.height(20.dp))
-
-            Text("✨ Ваш образ", style = MaterialTheme.typography.titleMedium)
-
-            Spacer(Modifier.height(12.dp))
-
-            // 🔥 CANVAS ДЛЯ СКРИНА
+            // 🔥 ОБРАЗ (центр экрана)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(500.dp)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .background(androidx.compose.ui.graphics.Color.White)
+                    .fillMaxSize()
+                    .padding(bottom = 140.dp) // место под кнопки
             ) {
-                outfitItems.forEach { item ->
-                    DraggableImage(item)
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // ================= SAVE (КАК В OutfitEditorScreen) =================
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-
-                    scope.launch {
-
-                        // 🔥 1. SCREENSHOT CANVAS
-                        val full = view.drawToBitmap()
-
-                        val croppedHeight = (full.height * 0.75f).toInt()
-
-                        val cropped = Bitmap.createBitmap(
-                            full,
-                            0,
-                            0,
-                            full.width,
-                            croppedHeight
-                        )
-
-                        // 🔥 2. SAVE FILE
-                        val file = File(
-                            context.cacheDir,
-                            "outfit_${System.currentTimeMillis()}.png"
-                        )
-
-                        FileOutputStream(file).use {
-                            cropped.compress(Bitmap.CompressFormat.PNG, 100, it)
-                        }
-
-                        // 🔥 3. STATES (как в OutfitEditorScreen)
-                        val states = outfitItems.map {
-                            OutfitItemState(
-                                itemId = it.item.id,
-                                x = it.offset.x,
-                                y = it.offset.y,
-                                scale = 1f
-                            )
-                        }
-
-                        // 🔥 4. SAVE IN DB
-                        vm.saveOutfit(
-                            itemIds = outfitItems.map { it.item.id },
-                            states = states,
-                            previewUri = file.absolutePath
-                        )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .height(500.dp)
+                        .background(androidx.compose.ui.graphics.Color.White)
+                ) {
+                    outfitItems.forEach { item ->
+                        DraggableImage(item)
                     }
                 }
-            ) {
-                Text("💾 Сохранить образ")
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    isCreated = false
-                    outfitItems.clear()
-                }
+            // ===================== FIXED BOTTOM BUTTONS =====================
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(
+                        start = 16.dp,
+                        end = 16.dp,
+                        bottom = 0.dp // 👈 меньше отступ = ниже кнопки
+                    ),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("🔄 Другой образ")
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+
+                        scope.launch {
+
+                            val fullBitmap = view.drawToBitmap()
+
+                            val croppedHeight = (fullBitmap.height * 0.72f).toInt()
+
+                            val croppedBitmap = Bitmap.createBitmap(
+                                fullBitmap,
+                                0,
+                                0,
+                                fullBitmap.width,
+                                croppedHeight
+                            )
+
+                            val file = File(
+                                context.cacheDir,
+                                "outfit_${System.currentTimeMillis()}.png"
+                            )
+
+                            FileOutputStream(file).use {
+                                croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
+
+                            vm.saveOutfit(
+                                itemIds = outfitItems.map { it.item.id },
+                                states = outfitItems.map {
+                                    OutfitItemState(
+                                        itemId = it.item.id,
+                                        x = it.offset.x,
+                                        y = it.offset.y,
+                                        scale = 1f
+                                    )
+                                },
+                                previewUri = file.absolutePath
+                            )
+                        }
+                    }
+                ) {
+                    Text("💾 Сохранить образ")
+                }
+
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        isCreated = false
+                        outfitItems.clear()
+                    }
+                ) {
+                    Text("🔄 Другой образ")
+                }
             }
         }
-
-        Spacer(Modifier.height(30.dp))
     }
 }
-
 // ================= DRAG =================
 
 @Composable
