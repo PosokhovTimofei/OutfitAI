@@ -26,69 +26,7 @@ fun AppNavHost() {
         }
 
         composable("main") {
-            MainScreen(navController)
-        }
-
-        composable("detail/{id}") { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id")?.toLongOrNull()
-
-            if (id != null) {
-                ClosetDetailScreen(
-                    itemId = id,
-                    navController = navController
-                )
-            }
-        }
-
-        // 🔥 НОВЫЙ ЭКРАН
-        composable("addItem/{imagePath}") { backStackEntry ->
-            val path = backStackEntry.arguments?.getString("imagePath")
-
-            if (path != null) {
-                AddItemScreen(
-                    imagePath = Uri.decode(path),
-                    navController = navController
-                )
-            }
-        }
-
-        composable("editor/{itemId}") { backStackEntry ->
-
-            val itemId = backStackEntry.arguments
-                ?.getString("itemId")
-                ?.toLongOrNull() ?: return@composable
-
-            EditorScreen(
-                itemId = itemId,
-                navController = navController
-            )
-        }
-
-        composable(
-            route = "outfit_editor/{ids}",
-            arguments = listOf(
-                navArgument("ids") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-
-            val ids = backStackEntry.arguments?.getString("ids") ?: ""
-
-            OutfitEditorScreen(
-                itemIds = ids,
-                navController = navController
-            )
-        }
-
-        composable("outfit_view/{id}") { backStackEntry ->
-
-            val id = backStackEntry.arguments
-                ?.getString("id")
-                ?.toLongOrNull() ?: return@composable
-
-            OutfitViewScreen(
-                outfitId = id,
-                navController = navController
-            )
+            MainScreen()
         }
     }
 }

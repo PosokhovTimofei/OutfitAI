@@ -1,36 +1,113 @@
 package com.example.myapplication.ui.theme.screens
 
-import androidx.compose.runtime.*
-import androidx.compose.material3.*
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavController
+import androidx.navigation.compose.*
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.example.myapplication.ui.theme.components.BottomBar
+import androidx.compose.runtime.getValue
 
 @Composable
-fun MainScreen(
-    navController: NavController
-) {
+fun MainScreen() {
 
-    var tab by remember { mutableStateOf(1) }
+    val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    val hideBottomBarRoutes = listOf(
+        "editor/{itemId}",
+        "addItem/{imagePath}",
+        "outfit_editor/{ids}"
+    )
+
+    val shouldShowBottomBar = currentRoute !in hideBottomBarRoutes
 
     Scaffold(
         bottomBar = {
-            BottomBar(selected = tab, onSelect = { tab = it })
+
+            if (shouldShowBottomBar) {
+
+                BottomBar(
+                    selected = 0,
+                    onSelect = { index ->
+                        when (index) {
+                            0 -> navController.navigate("home")
+                            1 -> navController.navigate("closet")
+                            2 -> navController.navigate("create")
+                            3 -> navController.navigate("favorites")
+                            4 -> navController.navigate("profile")
+                        }
+                    }
+                )
+            }
         }
     ) { padding ->
 
-        when (tab) {
-            0 -> MarketplaceScreen(Modifier.padding(padding))
-            1 -> ClosetScreen(
-                navController = navController,
-                modifier = Modifier.padding(padding)
-            )
-            2 -> GenerateOutfitScreen(Modifier.padding(padding))
-            3 -> FavoritesScreen(
-                navController = navController,
-                Modifier.padding(padding))
-            4 -> ProfileScreen(Modifier.padding(padding))
+        NavHost(
+            navController = navController,
+            startDestination = "closet",
+            modifier = Modifier.padding(padding)
+        ) {
+
+            composable("home") { MarketplaceScreen() }
+            composable("closet") { ClosetScreen(navController) }
+            composable("create") { GenerateOutfitScreen() }
+            composable("favorites") { FavoritesScreen(navController) }
+            composable("profile") { ProfileScreen() }
+
+            composable("detail/{id}") { backStackEntry ->
+                val id = backStackEntry.arguments
+                    ?.getString("id")
+                    ?.toLongOrNull() ?: return@composable
+
+                ClosetDetailScreen(itemId = id, navController = navController)
+            }
+
+            composable("addItem/{imagePath}") { backStackEntry ->
+                val path = backStackEntry.arguments?.getString("imagePath")
+
+                if (path != null) {
+                    AddItemScreen(
+                        imagePath = Uri.decode(path),
+                        navController = navController
+                    )
+                }
+            }
+
+            composable("editor/{itemId}") { backStackEntry ->
+                val itemId = backStackEntry.arguments
+                    ?.getString("itemId")
+                    ?.toLongOrNull() ?: return@composable
+
+                EditorScreen(
+                    itemId = itemId,
+                    navController = navController
+                )
+            }
+
+            composable("outfit_editor/{ids}") { backStackEntry ->
+                val ids = backStackEntry.arguments?.getString("ids") ?: ""
+
+                OutfitEditorScreen(
+                    itemIds = ids,
+                    navController = navController
+                )
+            }
+
+            composable("outfit_view/{id}") { backStackEntry ->
+                val id = backStackEntry.arguments
+                    ?.getString("id")
+                    ?.toLongOrNull() ?: return@composable
+
+                OutfitViewScreen(
+                    outfitId = id,
+                    navController = navController
+                )
+            }
         }
     }
 }

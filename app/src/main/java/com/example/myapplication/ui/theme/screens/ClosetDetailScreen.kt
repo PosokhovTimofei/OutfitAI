@@ -128,8 +128,7 @@ fun ClosetDetailScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(16.dp)
+
             ) {
                 Text("Сохранить изменения")
             }

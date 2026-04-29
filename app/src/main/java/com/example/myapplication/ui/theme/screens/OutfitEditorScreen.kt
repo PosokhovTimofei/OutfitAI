@@ -153,6 +153,10 @@ fun OutfitEditorScreen(
                         states = itemStates,
                         previewUri = file.absolutePath // <- ЭТО ИДЕТ В FAVORITES
                     )
+
+                    navController.navigate("favorites") {
+                        popUpTo("closet") { inclusive = false }
+                    }
                 }
             }
         ) {

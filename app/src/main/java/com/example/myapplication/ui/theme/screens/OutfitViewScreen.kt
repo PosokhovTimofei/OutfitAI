@@ -4,8 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -74,6 +72,7 @@ fun OutfitViewScreen(
             .background(Color.White)
     ) {
 
+        // ================= ITEMS =================
         editableStates.forEach { state ->
 
             val item = items.find { it.id == state.itemId }
@@ -84,104 +83,91 @@ fun OutfitViewScreen(
                 var y by remember { mutableStateOf(state.y) }
                 var scale by remember { mutableStateOf(state.scale) }
 
-                Box(
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(item.imageUri)
+                        .allowHardware(false)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
+                        .size(220.dp)
                         .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
-                ) {
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .pointerInput(item.id) {
+                            detectTransformGestures { _, pan, zoom, _ ->
 
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(item.imageUri)
-                            .allowHardware(false)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .size(220.dp)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                            .pointerInput(item.id) {
-                                detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(0.6f, 2.5f)
+                                x += pan.x
+                                y += pan.y
 
-                                    scale = (scale * zoom).coerceIn(0.6f, 2.5f)
-                                    x += pan.x
-                                    y += pan.y
+                                val index = editableStates.indexOfFirst { it.itemId == state.itemId }
 
-                                    val index = editableStates.indexOfFirst { it.itemId == state.itemId }
-
-                                    if (index != -1) {
-                                        editableStates[index] =
-                                            state.copy(x = x, y = y, scale = scale)
-                                    }
+                                if (index != -1) {
+                                    editableStates[index] =
+                                        state.copy(x = x, y = y, scale = scale)
                                 }
                             }
-                    )
-
-                    // ================= АККУРАТНОЕ УДАЛЕНИЕ =================
-                    IconButton(
-                        onClick = {
-                            editableStates.remove(state)
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Удалить"
-                        )
-                    }
-                }
+                        }
+                )
             }
         }
 
-        // ================= BUTTONS =================
-        Column(
+        // ================= SAVE BUTTON =================
+        Button(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp)
-        ) {
+                // 🔥 ВАЖНО: поднимаем выше системной панели
+                .fillMaxWidth(),
+            onClick = {
 
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
+                scope.launch {
 
-                    scope.launch {
+                    // 1. JSON
+                    val json = Gson().toJson(editableStates)
 
-                        val json = Gson().toJson(editableStates)
+                    // 2. скрин
+                    val fullBitmap: Bitmap = view.drawToBitmap()
 
-                        val bitmap: Bitmap = view.drawToBitmap()
+                    // 3. обрезка (убираем нижнюю область с кнопкой)
+                    val croppedHeight = (fullBitmap.height * 0.79f).toInt()
 
-                        val file = File(
-                            context.cacheDir,
-                            "outfit_${System.currentTimeMillis()}.png"
+                    val croppedBitmap = Bitmap.createBitmap(
+                        fullBitmap,
+                        0,
+                        0,
+                        fullBitmap.width,
+                        croppedHeight
+                    )
+
+                    val file = File(
+                        context.cacheDir,
+                        "outfit_${System.currentTimeMillis()}.png"
+                    )
+
+                    FileOutputStream(file).use {
+                        croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                    }
+
+                    // 4. сохраняем
+                    vm.updateOutfit(
+                        outfit.copy(
+                            layoutJson = json,
+                            previewUri = file.absolutePath
                         )
+                    )
 
-                        FileOutputStream(file).use {
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-                        }
-
-                        vm.updateOutfit(
-                            outfit.copy(
-                                layoutJson = json,
-                                previewUri = file.absolutePath
-                            )
-                        )
+                    // 🔥 ПЕРЕХОД НАЗАД В FAVORITES
+                    navController.navigate("favorites") {
+                        popUpTo("favorites") { inclusive = true }
                     }
                 }
-            ) {
-                Text("💾 Сохранить изменения")
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { navController.popBackStack() }
-            ) {
-                Text("⬅ Назад")
-            }
+        ) {
+            Text("💾 Сохранить")
         }
     }
 }
