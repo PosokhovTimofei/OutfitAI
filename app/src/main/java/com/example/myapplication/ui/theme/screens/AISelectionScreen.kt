@@ -27,6 +27,11 @@ import java.io.FileOutputStream
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
 
 // ================= STATE =================
 
@@ -57,6 +62,16 @@ fun GenerateOutfitScreen(
     var style by remember { mutableStateOf("Кэжуал") }
     var event by remember { mutableStateOf("Прогулка") }
 
+    // ================= WEATHER STATE =================
+    var temperature by remember { mutableStateOf("...") }
+    var weatherDesc by remember { mutableStateOf("Загрузка...") }
+
+    LaunchedEffect(Unit) {
+        val result = loadWeather()
+        temperature = result.first
+        weatherDesc = result.second
+    }
+
     val outfitItems = remember { mutableStateListOf<DraggableItem>() }
     var isCreated by remember { mutableStateOf(false) }
 
@@ -70,6 +85,21 @@ fun GenerateOutfitScreen(
                     .fillMaxSize()
                     .padding(24.dp)
             ) {
+
+                // ===== WEATHER CARD =====
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Погода")
+                        Spacer(Modifier.height(6.dp))
+                        Text("🌡 $temperature")
+                        Text("☁️ $weatherDesc")
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
 
                 DropdownField("Стиль", styles, style) { style = it }
 
@@ -85,67 +115,50 @@ fun GenerateOutfitScreen(
                         .height(60.dp),
                     onClick = {
 
-                        // ================= STYLE FILTER =================
-                        val styleFiltered = items.filter { item ->
+                        val base = items.filter { item ->
                             when (style) {
-                                "Кэжуал" -> true
-                                "Спорт" -> item.type.contains("Кроссовки", true)
-                                "Офис" -> item.type.contains("Рубашка", true) || item.type.contains("Джинсы", true)
-                                "Вечеринка" -> true
+                                "Спорт" -> item.style.equals("Спорт", true)
+                                "Офис" -> item.style.equals("Офис", true)
                                 else -> true
                             }
-                        }
+                        }.ifEmpty { items }
 
-                        val base = if (styleFiltered.isEmpty()) items else styleFiltered
-
-                        // ================= DRESS MODE =================
-                        val dresses = base.filter {
-                            it.type.equals("Платье", true)
-                        }
+                        // ===== DRESS MODE =====
+                        val dresses = base.filter { it.type.equals("Платье", true) }
 
                         if (dresses.isNotEmpty()) {
 
-                            val dress = dresses.random()
-
-                            val shoes = base.filter {
-                                it.type.equals("Кроссовки", true)
-                            }
+                            val shoes = base.filter { it.type.contains("Кроссовки", true) }
 
                             if (shoes.isNotEmpty()) {
-
                                 outfitItems.clear()
-
                                 outfitItems.addAll(
                                     listOf(
-                                        DraggableItem(dress, Offset(120f, 120f)),
+                                        DraggableItem(dresses.random(), Offset(120f, 120f)),
                                         DraggableItem(shoes.random(), Offset(140f, 380f))
                                     )
                                 )
-
                                 isCreated = true
                                 return@Button
                             }
                         }
 
-                        // ================= NORMAL MODE =================
+                        // ===== NORMAL MODE =====
                         val tops = base.filter {
-                            it.type.equals("Футболка", true) ||
-                                    it.type.equals("Рубашка", true)
+                            it.type.equals("Футболка", true) || it.type.equals("Рубашка", true)
                         }
 
                         val bottoms = base.filter {
-                            it.type.equals("Джинсы", true) ||
-                                    it.type.equals("Шорты", true)
+                            it.type.equals("Джинсы", true) || it.type.equals("Шорты", true)
                         }
 
                         val shoes = base.filter {
-                            it.type.equals("Кроссовки", true)
+                            it.type.contains("Кроссовки", true)
                         }
 
                         if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoes.isNotEmpty()) {
 
                             outfitItems.clear()
-
                             outfitItems.addAll(
                                 listOf(
                                     DraggableItem(tops.random(), Offset(100f, 50f)),
@@ -171,15 +184,13 @@ fun GenerateOutfitScreen(
                     .fillMaxSize()
                     .padding(bottom = 140.dp)
             ) {
-
                 Box(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth()
                         .height(500.dp)
-                        .background(androidx.compose.ui.graphics.Color.White)
+                        .background(Color.White)
                 ) {
-
                     outfitItems.forEach {
                         DraggableImage(it)
                     }
@@ -331,5 +342,51 @@ fun DropdownField(
                 )
             }
         }
+    }
+}
+
+suspend fun loadWeather(): Pair<String, String> = withContext(Dispatchers.IO) {
+    try {
+        val apiKey = "3753e020ec2b83a2f4639e411783a0aa"
+        val lat = 55.75
+        val lon = 37.62
+
+        val url = URL(
+            "https://api.openweathermap.org/data/2.5/weather" +
+                    "?lat=$lat&lon=$lon&units=metric&lang=ru&appid=$apiKey"
+        )
+
+        val connection = url.openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+
+        val stream = if (connection.responseCode in 200..299) {
+            connection.inputStream
+        } else {
+            connection.errorStream   // 🔥 ВАЖНО
+        }
+
+        val response = stream.bufferedReader().readText()
+
+        val json = JSONObject(response)
+
+        // если ошибка API
+        if (json.has("cod") && json.getString("cod") != "200") {
+            return@withContext "—" to json.optString("message", "ошибка API")
+        }
+
+        val temp = json.getJSONObject("main")
+            .getDouble("temp")
+            .toInt()
+            .toString() + "°C"
+
+        val desc = json.getJSONArray("weather")
+            .getJSONObject(0)
+            .getString("description")
+
+        temp to desc
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "—" to "нет данных"
     }
 }
