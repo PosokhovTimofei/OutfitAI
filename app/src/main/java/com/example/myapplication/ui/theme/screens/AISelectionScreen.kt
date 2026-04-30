@@ -40,6 +40,31 @@ data class DraggableItem(
     var offset: Offset = Offset(100f, 100f)
 )
 
+fun isTop(type: String) = type.containsAny(
+    "футболк", "рубашк", "лонгслив", "худи", "свит", "поло", "топ", "блуз", "майк", "корсет"
+)
+
+fun isBottom(type: String) = type.containsAny(
+    "джинс", "брюк", "шорт", "юбк", "леггинс", "джоггер"
+)
+
+fun isDress(type: String) = type.containsAny(
+    "плать", "сарафан"
+)
+
+fun isOuter(type: String) = type.containsAny(
+    "куртк", "пальто", "пиджак", "ветровк", "пуховик", "тренч", "кардиган", "бомбер", "косух"
+)
+
+fun isShoes(type: String) = type.containsAny(
+    "кроссов", "кед", "ботинк", "туфл", "сандал", "шлеп", "сапог", "лофер", "каблук"
+)
+
+// helper
+fun String.containsAny(vararg words: String): Boolean {
+    return words.any { this.contains(it, true) }
+}
+
 @Composable
 fun GenerateOutfitScreen(
     modifier: Modifier = Modifier
@@ -115,57 +140,83 @@ fun GenerateOutfitScreen(
                         .height(60.dp),
                     onClick = {
 
-                        val base = items.filter { item ->
-                            when (style) {
-                                "Спорт" -> item.style.equals("Спорт", true)
-                                "Офис" -> item.style.equals("Офис", true)
-                                else -> true
+                        val base = items
+
+                        val tops = base.filter { isTop(it.type) }
+                        val bottoms = base.filter { isBottom(it.type) }
+                        val dresses = base.filter { isDress(it.type) }
+                        val outers = base.filter { isOuter(it.type) }
+                        val shoes = base.filter { isShoes(it.type) }
+
+// 👉 температура
+                        val tempValue = temperature.replace("°C", "").toIntOrNull() ?: 20
+
+                        outfitItems.clear()
+
+// ================= СЦЕНАРИИ =================
+
+// 👗 ПЛАТЬЕ (свидание / вечеринка)
+                        if ((event == "Свидание" || event == "Прогулка") &&
+                            dresses.isNotEmpty() &&
+                            shoes.isNotEmpty() &&
+                            (0..1).random() == 1
+                        ) {
+                            outfitItems.add(DraggableItem(dresses.random(), Offset(120f, 120f)))
+                            outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
+
+                            if (tempValue < 15 && outers.isNotEmpty()) {
+                                outfitItems.add(DraggableItem(outers.random(), Offset(100f, 40f)))
                             }
-                        }.ifEmpty { items }
 
-                        // ===== DRESS MODE =====
-                        val dresses = base.filter { it.type.equals("Платье", true) }
+                            isCreated = true
+                            return@Button
+                        }
 
-                        if (dresses.isNotEmpty()) {
+// 👔 ОФИС
+                        if (style == "Офис") {
+                            val officeTop = tops.filter { it.type.containsAny("рубашк", "блуз") }
+                            val officeBottom = bottoms.filter { it.type.containsAny("брюк", "юбк") }
 
-                            val shoes = base.filter { it.type.contains("Кроссовки", true) }
+                            if (officeTop.isNotEmpty() && officeBottom.isNotEmpty() && shoes.isNotEmpty()) {
+                                outfitItems.add(DraggableItem(officeTop.random(), Offset(100f, 50f)))
+                                outfitItems.add(DraggableItem(officeBottom.random(), Offset(120f, 220f)))
+                                outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
 
-                            if (shoes.isNotEmpty()) {
-                                outfitItems.clear()
-                                outfitItems.addAll(
-                                    listOf(
-                                        DraggableItem(dresses.random(), Offset(120f, 120f)),
-                                        DraggableItem(shoes.random(), Offset(140f, 380f))
-                                    )
-                                )
+                                if (outers.isNotEmpty()) {
+                                    outfitItems.add(DraggableItem(outers.random(), Offset(90f, 0f)))
+                                }
+
                                 isCreated = true
                                 return@Button
                             }
                         }
 
-                        // ===== NORMAL MODE =====
-                        val tops = base.filter {
-                            it.type.equals("Футболка", true) || it.type.equals("Рубашка", true)
+// 🏃 СПОРТ
+                        if (style == "Спорт") {
+                            val sportTop = tops.filter { it.type.containsAny("худи", "свит", "футболк") }
+                            val sportBottom = bottoms.filter { it.type.containsAny("шорт", "джоггер", "леггинс") }
+                            val sportShoes = shoes.filter { it.type.contains("кроссов", true) }
+
+                            if (sportTop.isNotEmpty() && sportBottom.isNotEmpty() && sportShoes.isNotEmpty()) {
+                                outfitItems.add(DraggableItem(sportTop.random(), Offset(100f, 50f)))
+                                outfitItems.add(DraggableItem(sportBottom.random(), Offset(120f, 220f)))
+                                outfitItems.add(DraggableItem(sportShoes.random(), Offset(140f, 380f)))
+
+                                isCreated = true
+                                return@Button
+                            }
                         }
 
-                        val bottoms = base.filter {
-                            it.type.equals("Джинсы", true) || it.type.equals("Шорты", true)
-                        }
-
-                        val shoes = base.filter {
-                            it.type.contains("Кроссовки", true)
-                        }
-
+// 🌤 КЭЖУАЛ (универсал)
                         if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoes.isNotEmpty()) {
 
-                            outfitItems.clear()
-                            outfitItems.addAll(
-                                listOf(
-                                    DraggableItem(tops.random(), Offset(100f, 50f)),
-                                    DraggableItem(bottoms.random(), Offset(120f, 220f)),
-                                    DraggableItem(shoes.random(), Offset(140f, 380f))
-                                )
-                            )
+                            outfitItems.add(DraggableItem(tops.random(), Offset(100f, 50f)))
+                            outfitItems.add(DraggableItem(bottoms.random(), Offset(120f, 220f)))
+                            outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
+
+                            if (tempValue < 15 && outers.isNotEmpty()) {
+                                outfitItems.add(DraggableItem(outers.random(), Offset(90f, 0f)))
+                            }
 
                             isCreated = true
                         }
