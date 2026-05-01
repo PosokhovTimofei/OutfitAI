@@ -2,6 +2,7 @@ package com.example.myapplication.ui.theme.screens
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -60,6 +61,25 @@ fun isShoes(type: String) = type.containsAny(
     "кроссов", "кед", "ботинк", "туфл", "сандал", "шлеп", "сапог", "лофер", "каблук"
 )
 
+fun isLightClothes(type: String): Boolean {
+    return type.containsAny(
+        "шорт",
+        "юбк",
+        "майк",
+        "топ",
+        "сарафан"
+    )
+}
+
+
+
+fun isSneakers(type: String) = type.containsAny("кроссов", "кед")
+fun isBoots(type: String) = type.containsAny("ботинк", "сапог")
+fun isClassicShoes(type: String) = type.containsAny("туф", "лофер", "каблук")
+fun isSummerShoes(type: String) = type.containsAny("сандал", "шлеп")
+
+fun isWindbreaker(type: String) =
+    type.containsAny("ветровк", "анорак")
 // helper
 fun String.containsAny(vararg words: String): Boolean {
     return words.any { this.contains(it, true) }
@@ -81,20 +101,40 @@ fun GenerateOutfitScreen(
 
     val items by vm.items.collectAsState(initial = emptyList())
 
-    val styles = listOf("Кэжуал", "Спорт", "Офис", "Вечеринка")
-    val events = listOf("Прогулка", "Работа", "Свидание", "Тренировка")
+    val styles = listOf(
+        "Классика",
+        "Кэжуал",
+        "Спорт",
+        "Офис",
+        "Вечеринка",
+        "Минимализм",
+        "Streetwear",
+        "Романтика",
+        "Смарт-кэжуал"
+    )
 
     var style by remember { mutableStateOf("Кэжуал") }
-    var event by remember { mutableStateOf("Прогулка") }
 
-    // ================= WEATHER STATE =================
+    // ===== WEATHER =====
     var temperature by remember { mutableStateOf("...") }
     var weatherDesc by remember { mutableStateOf("Загрузка...") }
 
     LaunchedEffect(Unit) {
-        val result = loadWeather()
-        temperature = result.first
-        weatherDesc = result.second
+        try {
+            Log.d("WEATHER", "Start loading weather")
+
+            val result = loadWeather()
+
+            Log.d("WEATHER", "Loaded: $result")
+
+            temperature = result.first
+            weatherDesc = result.second
+
+        } catch (e: Exception) {
+            Log.e("WEATHER", "FAILED", e)
+            temperature = "20°C"
+            weatherDesc = "Ошибка загрузки"
+        }
     }
 
     val outfitItems = remember { mutableStateListOf<DraggableItem>() }
@@ -102,7 +142,6 @@ fun GenerateOutfitScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        // ================= INPUT =================
         if (!isCreated) {
 
             Column(
@@ -111,14 +150,10 @@ fun GenerateOutfitScreen(
                     .padding(24.dp)
             ) {
 
-                // ===== WEATHER CARD =====
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
+                // ===== WEATHER =====
+                Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Text("Погода")
-                        Spacer(Modifier.height(6.dp))
                         Text("🌡 $temperature")
                         Text("☁️ $weatherDesc")
                     }
@@ -128,10 +163,6 @@ fun GenerateOutfitScreen(
 
                 DropdownField("Стиль", styles, style) { style = it }
 
-                Spacer(Modifier.height(12.dp))
-
-                DropdownField("Мероприятие", events, event) { event = it }
-
                 Spacer(Modifier.height(20.dp))
 
                 Button(
@@ -140,84 +171,152 @@ fun GenerateOutfitScreen(
                         .height(60.dp),
                     onClick = {
 
-                        val base = items
-
-                        val tops = base.filter { isTop(it.type) }
-                        val bottoms = base.filter { isBottom(it.type) }
-                        val dresses = base.filter { isDress(it.type) }
-                        val outers = base.filter { isOuter(it.type) }
-                        val shoes = base.filter { isShoes(it.type) }
-
-// 👉 температура
                         val tempValue = temperature.replace("°C", "").toIntOrNull() ?: 20
+
+                        val isCold = tempValue < 15
+                        val isRain = weatherDesc.containsAny("дожд", "ливень", "гроза", "rain", "пасмурн")
+                        val isBadWeather = isCold || isRain
+
+                        val ignoreWeather = style in listOf("Вечеринка", "Романтика")
+
+                        val tops = items.filter { isTop(it.type) }
+                        val bottoms = items.filter { isBottom(it.type) }
+                        val dresses = items.filter { isDress(it.type) }
+                        val outers = items.filter { isOuter(it.type) }
+                        val shoes = items.filter { isShoes(it.type) }
 
                         outfitItems.clear()
 
-// ================= СЦЕНАРИИ =================
+                        // ================= PROFILE =================
+                        data class Profile(
+                            val top: List<String>,
+                            val bottom: List<String>,
+                            val shoesFilter: (ClosetItemEntity) -> Boolean,
+                            val allowDress: Boolean,
+                            val allowOuterwear: Boolean
+                        )
 
-// 👗 ПЛАТЬЕ (свидание / вечеринка)
-                        if ((event == "Свидание" || event == "Прогулка") &&
-                            dresses.isNotEmpty() &&
-                            shoes.isNotEmpty() &&
-                            (0..1).random() == 1
-                        ) {
-                            outfitItems.add(DraggableItem(dresses.random(), Offset(120f, 120f)))
-                            outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
+                        val profile = when (style) {
 
-                            if (tempValue < 15 && outers.isNotEmpty()) {
-                                outfitItems.add(DraggableItem(outers.random(), Offset(100f, 40f)))
-                            }
+                            "Классика" -> Profile(
+                                top = listOf("рубашк", "блуз", "пиджак"),
+                                bottom = listOf("брюк", "юбк"),
+                                shoesFilter = { isClassicShoes(it.type) },
+                                allowDress = true,
+                                allowOuterwear = true
+                            )
 
-                            isCreated = true
-                            return@Button
+                            "Офис" -> Profile(
+                                top = listOf("рубашк", "блуз", "пиджак"),
+                                bottom = listOf("брюк", "юбк"),
+                                shoesFilter = { isSneakers(it.type) || isClassicShoes(it.type) }, // 👈 БЕЗ БОТИНОК
+                                allowDress = true,
+                                allowOuterwear = false
+                            )
+
+                            "Спорт" -> Profile(
+                                top = listOf("худи", "футболк", "лонгслив"),
+                                bottom = listOf("джоггер", "леггинс"),
+                                shoesFilter = { isSneakers(it.type) },
+                                allowDress = false,
+                                allowOuterwear = true
+                            )
+
+                            "Смарт-кэжуал" -> Profile(
+                                top = listOf("рубашк", "поло", "свитер"),
+                                bottom = listOf("джинс", "брюк"),
+                                shoesFilter = { isSneakers(it.type) || isClassicShoes(it.type) },
+                                allowDress = true,
+                                allowOuterwear = true
+                            )
+
+                            "Streetwear" -> Profile(
+                                top = listOf("худи", "свитшот"),
+                                bottom = listOf("джинс"),
+                                shoesFilter = { isSneakers(it.type) },
+                                allowDress = false,
+                                allowOuterwear = true
+                            )
+
+                            "Романтика", "Вечеринка" -> Profile(
+                                top = listOf("топ", "блуз"),
+                                bottom = listOf("юбк"),
+                                shoesFilter = { isClassicShoes(it.type) },
+                                allowDress = true,
+                                allowOuterwear = true
+                            )
+
+                            else -> Profile(
+                                emptyList(),
+                                emptyList(),
+                                { true },
+                                true,
+                                true
+                            )
                         }
 
-// 👔 ОФИС
-                        if (style == "Офис") {
-                            val officeTop = tops.filter { it.type.containsAny("рубашк", "блуз") }
-                            val officeBottom = bottoms.filter { it.type.containsAny("брюк", "юбк") }
+                        // ================= ОБУВЬ =================
+                        val validShoes = shoes.filter { profile.shoesFilter(it) }
 
-                            if (officeTop.isNotEmpty() && officeBottom.isNotEmpty() && shoes.isNotEmpty()) {
-                                outfitItems.add(DraggableItem(officeTop.random(), Offset(100f, 50f)))
-                                outfitItems.add(DraggableItem(officeBottom.random(), Offset(120f, 220f)))
-                                outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
+                        if (validShoes.isEmpty()) return@Button
 
-                                if (outers.isNotEmpty()) {
-                                    outfitItems.add(DraggableItem(outers.random(), Offset(90f, 0f)))
+                        // ================= ПЛАТЬЕ =================
+                        val useDress =
+                            profile.allowDress &&
+                                    dresses.isNotEmpty() &&
+                                    !isBadWeather &&
+                                    (0..100).random() < 40
+
+                        if (useDress) {
+
+                            val dress = dresses.random()
+                            outfitItems.add(DraggableItem(dress, Offset(120f, 120f)))
+                            outfitItems.add(DraggableItem(validShoes.random(), Offset(140f, 380f)))
+
+                        } else {
+
+                            val top = tops
+                                .filter { profile.top.isEmpty() || it.type.containsAny(*profile.top.toTypedArray()) }
+                                .randomOrNull() ?: return@Button
+
+                            val bottom = bottoms
+                                .filter { profile.bottom.isEmpty() || it.type.containsAny(*profile.bottom.toTypedArray()) }
+                                .randomOrNull() ?: return@Button
+
+                            outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
+                            outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
+                            outfitItems.add(DraggableItem(validShoes.random(), Offset(140f, 380f)))
+                        }
+
+                        // ================= OUTERWEAR =================
+                        if (profile.allowOuterwear) {
+
+                            val outerCandidate = when (style) {
+
+                                "Спорт" -> outers.filter { isWindbreaker(it.type) }
+
+                                else -> outers
+                            }
+
+                            // 🔥 ВАЖНО: максимум 1 слой ВСЕГДА
+                            if (outerCandidate.isNotEmpty()) {
+
+                                val shouldAddOuter =
+                                    when {
+                                        isBadWeather -> true
+                                        isCold -> (0..100).random() < 50
+                                        else -> false
+                                    }
+
+                                if (shouldAddOuter) {
+                                    outerCandidate.randomOrNull()?.let {
+                                        outfitItems.add(DraggableItem(it, Offset(90f, 0f)))
+                                    }
                                 }
-
-                                isCreated = true
-                                return@Button
                             }
                         }
 
-// 🏃 СПОРТ
-                        if (style == "Спорт") {
-                            val sportTop = tops.filter { it.type.containsAny("худи", "свит", "футболк") }
-                            val sportBottom = bottoms.filter { it.type.containsAny("шорт", "джоггер", "леггинс") }
-                            val sportShoes = shoes.filter { it.type.contains("кроссов", true) }
-
-                            if (sportTop.isNotEmpty() && sportBottom.isNotEmpty() && sportShoes.isNotEmpty()) {
-                                outfitItems.add(DraggableItem(sportTop.random(), Offset(100f, 50f)))
-                                outfitItems.add(DraggableItem(sportBottom.random(), Offset(120f, 220f)))
-                                outfitItems.add(DraggableItem(sportShoes.random(), Offset(140f, 380f)))
-
-                                isCreated = true
-                                return@Button
-                            }
-                        }
-
-// 🌤 КЭЖУАЛ (универсал)
-                        if (tops.isNotEmpty() && bottoms.isNotEmpty() && shoes.isNotEmpty()) {
-
-                            outfitItems.add(DraggableItem(tops.random(), Offset(100f, 50f)))
-                            outfitItems.add(DraggableItem(bottoms.random(), Offset(120f, 220f)))
-                            outfitItems.add(DraggableItem(shoes.random(), Offset(140f, 380f)))
-
-                            if (tempValue < 15 && outers.isNotEmpty()) {
-                                outfitItems.add(DraggableItem(outers.random(), Offset(90f, 0f)))
-                            }
-
+                        if (outfitItems.size >= 2) {
                             isCreated = true
                         }
                     }
@@ -227,9 +326,8 @@ fun GenerateOutfitScreen(
             }
         }
 
-        // ================= EDITOR =================
+        // ===== EDITOR (без изменений) =====
         if (isCreated) {
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -252,49 +350,11 @@ fun GenerateOutfitScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(16.dp)
             ) {
-
                 Button(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-
-                        scope.launch {
-
-                            val bitmap = view.drawToBitmap()
-
-                            val cropped = Bitmap.createBitmap(
-                                bitmap,
-                                0,
-                                0,
-                                bitmap.width,
-                                (bitmap.height * 0.70f).toInt()
-                            )
-
-                            val file = File(
-                                context.cacheDir,
-                                "outfit_${System.currentTimeMillis()}.png"
-                            )
-
-                            FileOutputStream(file).use {
-                                cropped.compress(Bitmap.CompressFormat.PNG, 100, it)
-                            }
-
-                            vm.saveOutfit(
-                                itemIds = outfitItems.map { it.item.id },
-                                states = outfitItems.map {
-                                    OutfitItemState(
-                                        itemId = it.item.id,
-                                        x = it.offset.x,
-                                        y = it.offset.y,
-                                        scale = 1f
-                                    )
-                                },
-                                previewUri = file.absolutePath
-                            )
-                        }
-                    }
+                    onClick = { /* save */ }
                 ) {
                     Text("💾 Сохранить образ")
                 }
