@@ -3,6 +3,13 @@ package com.example.myapplication.ui.theme.screens
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -28,11 +35,19 @@ import java.io.FileOutputStream
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import com.example.myapplication.R
 
 // ================= STATE =================
 
@@ -151,13 +166,10 @@ fun GenerateOutfitScreen(
             ) {
 
                 // ===== WEATHER =====
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("Погода")
-                        Text("🌡 $temperature")
-                        Text("☁️ $weatherDesc")
-                    }
-                }
+                LottieWeatherCard(
+                    temperature = temperature,
+                    description = weatherDesc
+                )
 
                 Spacer(Modifier.height(12.dp))
 
@@ -499,5 +511,195 @@ suspend fun loadWeather(): Pair<String, String> = withContext(Dispatchers.IO) {
     } catch (e: Exception) {
         e.printStackTrace()
         "—" to "нет данных"
+    }
+}
+
+@Composable
+fun LottieWeatherCard(
+    temperature: String,
+    description: String
+) {
+    val weatherType = remember(description) {
+        when {
+            description.contains("дожд", true) -> "rain"
+            description.contains("снег", true) -> "snow"
+            description.contains("ясн", true) -> "sun"
+            else -> "cloud"
+        }
+    }
+
+    val resId = when (weatherType) {
+        "sun" -> R.raw.sun
+        "rain" -> R.raw.rain
+        "snow" -> R.raw.snow
+        else -> R.raw.cloud
+    }
+
+    val composition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(resId)
+    )
+
+    val progress by animateLottieCompositionAsState(
+        composition,
+        iterations = LottieConstants.IterateForever,
+        isPlaying = true
+    )
+
+    // 🌊 анимации движения карточки
+    val infinite = rememberInfiniteTransition(label = "weather_card")
+
+    val float by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "float"
+    )
+
+    val scale by infinite.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.02f,
+        animationSpec = infiniteRepeatable(
+            tween(3500),
+            RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+
+    // 🌌 ТЁМНЫЙ ПРЕМИУМ ФОН
+    val background = when (weatherType) {
+
+        "sun" -> Brush.radialGradient(
+            colors = listOf(
+                Color(0xFF1A1A2E),
+                Color(0xFF16213E),
+                Color(0xFF0F3460)
+            )
+        )
+
+        "rain" -> Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF0B1320),
+                Color(0xFF1B2A41),
+                Color(0xFF324A5F)
+            )
+        )
+
+        "snow" -> Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF0F172A),
+                Color(0xFF1E293B),
+                Color(0xFF334155)
+            )
+        )
+
+        else -> Brush.verticalGradient(
+            colors = listOf(
+                Color(0xFF0B0F1A),
+                Color(0xFF151B2E),
+                Color(0xFF1C2541)
+            )
+        )
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(160.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = float
+            },
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(background)
+                .padding(16.dp)
+        ) {
+
+            // 🌑 ВИНЬЕТКА (глубина как в iOS)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0xAA000000)
+                            ),
+                            radius = 900f
+                        )
+                    )
+            )
+
+            // ✨ СВЕЧЕНИЕ (атмосфера)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.05f),
+                                Color.Transparent
+                            ),
+                            radius = 700f
+                        )
+                    )
+            )
+
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                // 🌤 Lottie (слегка “плавает”)
+                LottieAnimation(
+                    composition = composition,
+                    progress = { progress },
+                    modifier = Modifier
+                        .size(100.dp)
+                        .graphicsLayer {
+                            translationY = -float / 2
+                        }
+                )
+
+                Spacer(Modifier.width(12.dp))
+
+                Column {
+
+                    Text(
+                        text = temperature,
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.White
+                    )
+
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
+
+            // 🌬 декоративные частицы атмосферы
+            Text(
+                text = "✦  ✦   ✦",
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .graphicsLayer {
+                        alpha = 0.25f
+                        translationY = float
+                    },
+                color = Color.White
+            )
+        }
     }
 }
