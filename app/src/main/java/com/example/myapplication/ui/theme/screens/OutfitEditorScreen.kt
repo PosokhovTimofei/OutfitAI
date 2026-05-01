@@ -1,13 +1,22 @@
 package com.example.myapplication.ui.theme.screens
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -18,22 +27,17 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.drawToBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.myapplication.MyApp
-import com.example.myapplication.data.ClosetItemEntity
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
-data class OutfitItemState(
-    val itemId: Long,
-    val x: Float,
-    val y: Float,
-    val scale: Float
-)
 
+
+// ================= SCREEN =================
 @Composable
 fun OutfitEditorScreen(
     itemIds: String,
@@ -62,114 +66,156 @@ fun OutfitEditorScreen(
 
     val itemStates = remember { mutableStateListOf<OutfitItemState>() }
 
+    var selectedId by remember { mutableStateOf<Long?>(null) }
+
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.75f)
+            .fillMaxSize()
             .background(Color.White)
     ) {
 
+        // ================= ITEMS =================
         selectedItems.forEach { item ->
 
-            var x by remember { mutableStateOf(300f) }
-            var y by remember { mutableStateOf(300f) }
-            var scale by remember { mutableStateOf(1f) }
+            val index = itemStates.indexOfFirst { it.itemId == item.id }
 
-            val painter = rememberAsyncImagePainter(
-                model = ImageRequest.Builder(context)
-                    .data(item.imageUri)
-                    .allowHardware(false)
-                    .build()
-            )
-
-            fun emit() {
-                itemStates.removeAll { it.itemId == item.id }
-                itemStates.add(
-                    OutfitItemState(item.id, x, y, scale)
-                )
+            val state = if (index != -1)
+                itemStates[index]
+            else {
+                val new = OutfitItemState(item.id, 300f, 300f, 1f)
+                itemStates.add(new)
+                new
             }
 
-            Image(
-                painter = painter,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
+            val isSelected = selectedId == item.id
+
+            Box(
                 modifier = Modifier
-                    .size(220.dp)
-                    .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                    .offset {
+                        IntOffset(state.x.roundToInt(), state.y.roundToInt())
+                    }
                     .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
+                        scaleX = state.scale
+                        scaleY = state.scale
+                    }
+                    .then(Modifier)
+                    .pointerInput(item.id) {
+                        detectTapGestures(
+                            onTap = {
+                                selectedId =
+                                    if (selectedId == item.id) null else item.id
+                            }
+                        )
                     }
                     .pointerInput(item.id) {
                         detectTransformGestures { _, pan, zoom, _ ->
-                            scale = (scale * zoom).coerceIn(0.6f, 2.5f)
-                            x += pan.x
-                            y += pan.y
-                            emit()
+
+                            val i = itemStates.indexOfFirst { it.itemId == item.id }
+                            if (i == -1) return@detectTransformGestures
+
+                            val current = itemStates[i]
+
+                            itemStates[i] = current.copy(
+                                x = current.x + pan.x,
+                                y = current.y + pan.y,
+                                scale = (current.scale * zoom).coerceIn(0.6f, 2.5f)
+                            )
                         }
                     }
-            )
+            ) {
+
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(item.imageUri)
+                        .allowHardware(false)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(220.dp)
+                )
+            }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Bottom
+    // ================= CENTER BUTTONS =================
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomCenter
     ) {
 
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White.copy(alpha = 0.95f),
+            tonalElevation = 10.dp,
+            modifier = Modifier
+                .padding(bottom = 20.dp)
+                .shadow(20.dp, RoundedCornerShape(28.dp))
+        ) {
 
-                scope.launch {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-                    // 🔥 1. СКРИН ТОЛЬКО КАНВАСА
-                    val full = view.drawToBitmap()
+                // 💾 SAVE
+                IconButton(
+                    onClick = {
+                        scope.launch {
 
-                    val croppedHeight = (full.height * 0.75f).toInt()
+                            val fullBitmap: Bitmap = view.drawToBitmap()
 
-                    val cropped = Bitmap.createBitmap(
-                        full,
-                        0,
-                        0,
-                        full.width,
-                        croppedHeight
-                    )
+                            // 🔥 обрезаем нижнюю панель (примерно 0.82f — чуть выше кнопок)
+                            val croppedHeight = (fullBitmap.height * 0.76f).toInt()
 
-                    val file = File(
-                        context.cacheDir,
-                        "outfit_${System.currentTimeMillis()}.png"
-                    )
+                            val croppedBitmap = Bitmap.createBitmap(
+                                fullBitmap,
+                                0,
+                                0,
+                                fullBitmap.width,
+                                croppedHeight
+                            )
 
-                    FileOutputStream(file).use {
-                        cropped.compress(Bitmap.CompressFormat.PNG, 100, it)
-                    }
+                            val file = File(
+                                context.cacheDir,
+                                "outfit_${System.currentTimeMillis()}.png"
+                            )
 
-                    // 🔥 2. СОХРАНЯЕМ:
-                    vm.saveOutfit(
-                        itemIds = idList,
-                        states = itemStates,
-                        previewUri = file.absolutePath // <- ЭТО ИДЕТ В FAVORITES
-                    )
+                            FileOutputStream(file).use {
+                                croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
 
-                    navController.navigate("favorites") {
-                        popUpTo("closet") { inclusive = false }
-                    }
+                            vm.saveOutfit(
+                                itemIds = idList,
+                                states = itemStates,
+                                previewUri = file.absolutePath
+                            )
+
+                            navController.navigate("favorites")
+                        }
+                    },
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0A84FF))
+                ) {
+                    Icon(Icons.Default.Save, null, tint = Color.White)
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                // ⬅ BACK
+                IconButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF2F2F7))
+                ) {
+                    Icon(Icons.Default.ArrowBack, null, tint = Color.Black)
                 }
             }
-        ) {
-            Text("💾 Сохранить образ")
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { navController.popBackStack() }
-        ) {
-            Text("⬅ Назад")
         }
     }
 }

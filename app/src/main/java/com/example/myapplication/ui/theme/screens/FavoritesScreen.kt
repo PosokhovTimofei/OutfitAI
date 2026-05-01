@@ -67,7 +67,14 @@ fun FavoritesScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(0.5f)
+                            .aspectRatio(0.5f),
+                        shape = MaterialTheme.shapes.medium,
+                        elevation = CardDefaults.cardElevation(
+                            defaultElevation = 8.dp
+                        ),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     ) {
 
                         Box(modifier = Modifier.fillMaxSize()) {
