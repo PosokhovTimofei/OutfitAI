@@ -24,6 +24,16 @@ fun MainScreen() {
         "outfit_editor/{ids}"
     )
 
+
+    val selectedIndex = when (currentRoute) {
+        "home" -> 0
+        "closet" -> 1
+        "create" -> 2
+        "favorites" -> 3
+        "profile" -> 4
+        else -> 0
+    }
+
     val shouldShowBottomBar = currentRoute !in hideBottomBarRoutes
 
     Scaffold(
@@ -32,11 +42,15 @@ fun MainScreen() {
             if (shouldShowBottomBar) {
 
                 BottomBar(
-                    selected = 0,
+                    selected = selectedIndex,
                     onSelect = { index ->
                         when (index) {
-                            0 -> navController.navigate("home")
-                            1 -> navController.navigate("closet")
+                            0 -> navController.navigate("home") {
+                                popUpTo("home") { inclusive = true }
+                            }
+                            1 -> navController.navigate("closet") {
+                                popUpTo("closet") { inclusive = true }
+                            }
                             2 -> navController.navigate("create")
                             3 -> navController.navigate("favorites")
                             4 -> navController.navigate("profile")
