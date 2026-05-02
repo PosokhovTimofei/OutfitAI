@@ -366,7 +366,58 @@ fun GenerateOutfitScreen(
             ) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { /* save */ }
+                    onClick = {
+                        scope.launch {
+
+                            // 1. собираем состояния
+                            val states = outfitItems.map {
+                                OutfitItemState(
+                                    itemId = it.item.id,
+                                    x = it.offset.x,
+                                    y = it.offset.y,
+                                    scale = 1f,     // пока нет зума — ставим 1
+                                    zIndex = 0f     // пока нет слоёв — 0
+                                )
+                            }
+
+                            val itemIds = outfitItems.map { it.item.id }
+
+                            // 2. делаем скрин
+                            val fullBitmap = view.drawToBitmap()
+
+                            // 3. обрезаем низ (где кнопки)
+                            val croppedHeight = (fullBitmap.height * 0.75f).toInt()
+
+                            val croppedBitmap = Bitmap.createBitmap(
+                                fullBitmap,
+                                0,
+                                0,
+                                fullBitmap.width,
+                                croppedHeight
+                            )
+
+                            // 4. сохраняем файл
+                            val file = File(
+                                context.cacheDir,
+                                "outfit_${System.currentTimeMillis()}.png"
+                            )
+
+                            FileOutputStream(file).use {
+                                croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
+
+                            // 5. сохраняем через ViewModel
+                            vm.saveOutfit(
+                                itemIds = itemIds,
+                                states = states,
+                                previewUri = file.absolutePath
+                            )
+
+                            // 6. сброс UI
+                            isCreated = false
+                            outfitItems.clear()
+                        }
+                    }
                 ) {
                     Text("💾 Сохранить образ")
                 }
