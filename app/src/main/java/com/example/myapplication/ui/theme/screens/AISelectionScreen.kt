@@ -386,7 +386,7 @@ fun GenerateOutfitScreen(
                             val fullBitmap = view.drawToBitmap()
 
                             // 3. обрезаем низ (где кнопки)
-                            val croppedHeight = (fullBitmap.height * 0.75f).toInt()
+                            val croppedHeight = (fullBitmap.height * 0.70f).toInt()
 
                             val croppedBitmap = Bitmap.createBitmap(
                                 fullBitmap,

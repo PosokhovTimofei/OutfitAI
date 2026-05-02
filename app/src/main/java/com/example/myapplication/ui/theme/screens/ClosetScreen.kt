@@ -48,7 +48,13 @@ import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -304,12 +310,13 @@ fun ClosetScreen(
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
 
-            Button(
-                modifier = Modifier.weight(1f),
+            // 📸 CAMERA
+            IconButton(
                 onClick = {
 
                     val values = ContentValues().apply {
@@ -333,16 +340,24 @@ fun ClosetScreen(
                         if (granted) cameraLauncher.launch(uri)
                         else permissionLauncher.launch(Manifest.permission.CAMERA)
                     }
-                }
+                },
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0A84FF))
             ) {
-                Text("📸 Камера")
+                Icon(Icons.Default.PhotoCamera, null, tint = Color.White)
             }
 
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = { galleryLauncher.launch("image/*") }
+            // 🖼 GALLERY
+            IconButton(
+                onClick = { galleryLauncher.launch("image/*") },
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF2F2F7))
             ) {
-                Text("🖼 Галерея")
+                Icon(Icons.Default.Image, null, tint = Color.Black)
             }
         }
 
@@ -351,6 +366,32 @@ fun ClosetScreen(
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
+        }
+    }
+}
+
+@Composable
+fun BigActionButton(
+    icon: ImageVector,
+    text: String,
+    background: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = Color.White.copy(alpha = 0.95f),
+        tonalElevation = 10.dp,
+        modifier = Modifier.shadow(20.dp, RoundedCornerShape(28.dp))
+    ) {
+        Button(
+            onClick = onClick,
+            colors = ButtonDefaults.buttonColors(containerColor = background),
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.height(56.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text(text)
         }
     }
 }
