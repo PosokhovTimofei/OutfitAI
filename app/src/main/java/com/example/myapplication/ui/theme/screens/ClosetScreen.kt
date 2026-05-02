@@ -38,13 +38,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.example.myapplication.data.ClosetItemEntity
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Checkroom
+import androidx.compose.material.icons.filled.Accessibility
+import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClosetScreen(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {
 
+    var showFilters by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val resolver = context.contentResolver
@@ -55,6 +68,8 @@ fun ClosetScreen(
         )
     )
 
+
+
     var isLoading by remember { mutableStateOf(false) }
     val items by vm.items.collectAsState()
 
@@ -64,7 +79,6 @@ fun ClosetScreen(
     var selectedItems by remember { mutableStateOf<List<ClosetItemEntity>>(emptyList()) }
     val isSelectionMode = selectedItems.isNotEmpty()
 
-    // ================= CAMERA =================
     val cameraLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && tempUri != null) {
@@ -103,70 +117,157 @@ fun ClosetScreen(
             }
         }
 
+    // ===== ФИЛЬТРЫ =====
+    var selectedFilter by remember { mutableStateOf("Все") }
+
+    val filters = listOf(
+        "Все",
+        "Верх",
+        "Низ",
+        "Обувь",
+        "Верхняя",
+        "Другое"
+    )
+
+    val filteredItems = items.filter { item ->
+        when (selectedFilter) {
+            "Все" -> true
+            "Верх" -> isTop(item.type)
+            "Низ" -> isBottom(item.type)
+            "Обувь" -> isShoes(item.type)
+            "Верхняя" -> isOuter(item.type)
+            "Другое" -> !(isTop(item.type) || isBottom(item.type) || isShoes(item.type) || isOuter(item.type))
+            else -> true
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
 
-        // ================= GRID =================
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(160.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
 
-            items(items, key = { it.id }) { item ->
+            // ================= TOP FILTER BAR =================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-                val isSelected = selectedItems.contains(item)
-
-                Card(
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .then(
-                            if (isSelected)
-                                Modifier.border(3.dp, MaterialTheme.colorScheme.primary)
-                            else Modifier
-                        )
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    items(filters) { filter ->
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .combinedClickable(
+                        val isSelected = filter == selectedFilter
 
-                                // ОДИН КЛИК
-                                onClick = {
-                                    if (isSelectionMode) {
-                                        toggleSelect(item, selectedItems) {
-                                            selectedItems = it
-                                        }
-                                    } else {
-                                        navController.navigate("detail/${item.id}")
+                        ModernCategoryChip(
+                            text = filter,
+                            isSelected = isSelected,
+                            onClick = { selectedFilter = filter }
+                        )
+                    }
+                }
+
+                if (showFilters) {
+                    ModalBottomSheet(
+                        onDismissRequest = { showFilters = false }
+                    ) {
+
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+
+                            Text(
+                                text = "Фильтры",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+
+                            Spacer(Modifier.height(12.dp))
+
+                            val filters = listOf("Все", "Верх", "Низ", "Обувь", "Верхняя")
+
+                            filters.forEach { filter ->
+
+                                Button(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = {
+                                        selectedFilter = filter   // 👈 твоя текущая логика
+                                        showFilters = false
                                     }
-                                },
-
-                                // ДОЛГОЕ НАЖАТИЕ → старт выбора
-                                onLongClick = {
-                                    toggleSelect(item, selectedItems) {
-                                        selectedItems = it
-                                    }
+                                ) {
+                                    Text(filter)
                                 }
+
+                                Spacer(Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ================= GRID =================
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(160.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+
+                items(filteredItems, key = { it.id }) { item ->
+
+                    val isSelected = selectedItems.contains(item)
+
+                    Card(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .then(
+                                if (isSelected)
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary)
+                                else Modifier
                             )
                     ) {
 
-                        AsyncImage(
-                            model = item.imageUri,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .combinedClickable(
 
-                        IconButton(
-                            onClick = { vm.delete(item) },
-                            modifier = Modifier.align(Alignment.TopEnd)
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            toggleSelect(item, selectedItems) {
+                                                selectedItems = it
+                                            }
+                                        } else {
+                                            navController.navigate("detail/${item.id}")
+                                        }
+                                    },
+
+                                    onLongClick = {
+                                        toggleSelect(item, selectedItems) {
+                                            selectedItems = it
+                                        }
+                                    }
+                                )
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить")
+
+                            AsyncImage(
+                                model = item.imageUri,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            IconButton(
+                                onClick = { vm.delete(item) },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить")
+                            }
                         }
                     }
                 }
@@ -176,7 +277,6 @@ fun ClosetScreen(
         // ================= CREATE BUTTON =================
         if (selectedItems.size == 3) {
 
-            // затемнение
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -301,3 +401,59 @@ fun toggleSelect(
     update(list)
 }
 
+@Composable
+fun ModernCategoryChip(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+
+    val (icon, color) = when (text) {
+        "Все" -> Icons.Default.Apps to Color(0xFF9E9E9E)
+        "Верх" -> Icons.Default.Checkroom to Color(0xFF42A5F5)
+        "Низ" -> Icons.Default.Accessibility to Color(0xFF66BB6A)
+        "Обувь" -> Icons.Default.DirectionsWalk to Color(0xFFFFA726)
+        "Верхняя" -> Icons.Default.AcUnit to Color(0xFFAB47BC)
+        else -> Icons.Default.Category to Color(0xFFBDBDBD)
+    }
+
+    val background = if (isSelected)
+        color.copy(alpha = 0.15f)
+    else
+        MaterialTheme.colorScheme.surface
+
+    val borderColor = if (isSelected)
+        color
+    else
+        Color.LightGray.copy(alpha = 0.4f)
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = background,
+        border = BorderStroke(1.dp, borderColor),
+        tonalElevation = if (isSelected) 4.dp else 1.dp
+    ) {
+
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp)
+            )
+
+            Spacer(Modifier.width(6.dp))
+
+            Text(
+                text = text,
+                color = if (isSelected) color else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
