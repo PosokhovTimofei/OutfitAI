@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -37,6 +38,8 @@ import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.ui.input.pointer.util.*
 import com.example.myapplication.data.TFLiteClassifier
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.ui.graphics.Color
 
 // ==========================
 // 🔥 ЛАСТИК
@@ -247,38 +250,70 @@ fun EraserEditor(
             }
         }
 
-        // ===================== BRUSH SIZE =====================
-        Spacer(Modifier.height(12.dp))
-
-        Text(
-            "Размер кисти: ${brushSize.toInt()}",
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        Slider(
-            value = brushSize,
-            onValueChange = { brushSize = it },
-            valueRange = 10f..120f,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
-
-        // ===================== RESET BUTTON =====================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+        // ===================== TOOL PANEL (GOOGLE STYLE) =====================
+        Surface(
+            tonalElevation = 6.dp,
+            color = Color.White,
+            modifier = Modifier.fillMaxWidth()
         ) {
 
-            Button(onClick = {
-                workingBitmap =
-                    originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
 
-                onBitmapChange(workingBitmap)
-                redrawTrigger++
-                initialized = false
-            }) {
-                Text("Сброс")
+                // ===== BRUSH SIZE LABEL =====
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Размер кисти",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+
+                    Text(
+                        text = brushSize.toInt().toString(),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.Black
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // ===== MODERN SLIDER =====
+                Slider(
+                    value = brushSize,
+                    onValueChange = { brushSize = it },
+                    valueRange = 10f..120f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Color.Black,
+                        activeTrackColor = Color.Black,
+                        inactiveTrackColor = Color(0xFFE0E0E0)
+                    )
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                // ===== RESET ONLY BUTTON =====
+                OutlinedButton(
+                    onClick = {
+                        workingBitmap =
+                            originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+
+                        onBitmapChange(workingBitmap)
+                        redrawTrigger++
+                        initialized = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Сброс")
+                }
             }
         }
     }
@@ -698,31 +733,59 @@ fun SelectBottomSheet(
     var search by remember { mutableStateOf("") }
 
     val filtered = options.filter {
-        it.contains(search, true)
+        it.contains(search, ignoreCase = true)
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
+
         Column(Modifier.padding(16.dp)) {
 
+            // 🔍 КРАСИВЫЙ SEARCH (как ModernTextField)
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
                 label = { Text("Поиск") },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Black,
+                    unfocusedBorderColor = Color.LightGray,
+                    cursorColor = Color.Black,
+                    focusedLabelColor = Color.Black,
+                    unfocusedLabelColor = Color.Gray,
+                    selectionColors = TextSelectionColors(
+                        handleColor = Color.Black,
+                        backgroundColor = Color(0x33222222)
+                    )
+                )
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
-            LazyColumn {
+            // 📋 LIST (чуть современнее)
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 items(filtered) { item ->
-                    ListItem(
-                        headlineContent = { Text(item) },
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFFF5F5F5),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onSelect(item) }
-                    )
+                    ) {
+                        Text(
+                            text = item,
+                            modifier = Modifier.padding(14.dp),
+                            color = Color.Black
+                        )
+                    }
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
         }
     }
 }

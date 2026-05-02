@@ -45,8 +45,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 
 @Composable
@@ -63,7 +66,6 @@ fun ClosetDetailScreen(
     val items by vm.items.collectAsState()
     val item = items.find { it.id == itemId } ?: return
 
-    // ================= STATE =================
     var name by remember { mutableStateOf(item.label) }
     var type by remember { mutableStateOf(item.type) }
     var category by remember { mutableStateOf(item.category) }
@@ -77,7 +79,6 @@ fun ClosetDetailScreen(
 
     val imagePath = item.imageUri
 
-    // ================= OPTIONS =================
     val colorOptions = listOf(
         "Черный" to Color.Black,
         "Белый" to Color.White,
@@ -106,31 +107,44 @@ fun ClosetDetailScreen(
         )
     }
 
-    // ================= LAYOUT =================
+    fun save() {
+        vm.updateItem(
+            item.copy(
+                label = name,
+                type = type,
+                category = category,
+                style = style,
+                brand = brand,
+                price = price,
+                color = color,
+                material = material,
+                imageUri = imagePath
+            )
+        )
+        navController.popBackStack()
+    }
+
     Scaffold(
         bottomBar = {
-            Button(
-                onClick = {
-                    vm.updateItem(
-                        item.copy(
-                            label = name,
-                            type = type,
-                            category = category,
-                            style = style,
-                            brand = brand,
-                            price = price,
-                            color = color,
-                            material = material,
-                            imageUri = imagePath
-                        )
-                    )
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-
+            Surface(
+                color = Color.White,   // 💥 ВАЖНО: фиксируем белый фон
+                shadowElevation = 10.dp
             ) {
-                Text("Сохранить изменения")
+                ElevatedButton(
+                    onClick = { save() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.elevatedButtonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Checkroom, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Сохранить изменения")
+                }
             }
         }
     ) { padding ->
@@ -146,21 +160,30 @@ fun ClosetDetailScreen(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(400.dp)
+                        .height(360.dp)
+                        .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                        .background(Color(0xFFF5F5F5))
                 ) {
 
                     AsyncImage(
                         model = File(imagePath),
                         contentDescription = null,
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
 
                     IconButton(
                         onClick = { navController.navigate("editor/$itemId") },
-                        modifier = Modifier.align(Alignment.TopEnd)
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .background(Color.Transparent)
                     ) {
-                        Icon(Icons.Default.Edit, null)
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.Black // или Color.Gray для мягкого UI
+                        )
                     }
                 }
             }
@@ -169,17 +192,15 @@ fun ClosetDetailScreen(
             item {
                 Column(Modifier.padding(16.dp)) {
 
-                    OutlinedTextField(
+                    ModernTextField(
                         value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Название") },
-                        modifier = Modifier.fillMaxWidth()
+                        onChange = { name = it },
+                        label = "Название"
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    SectionCard("Категория", Icons.Default.Checkroom) {
-
+                    SectionCardModern("Категория", Icons.Default.Checkroom) {
                         SelectRow("Тип", type, Icons.Default.Style) {
                             currentOptions = typeOptionsRu
                             onSelect = { type = it }
@@ -197,8 +218,12 @@ fun ClosetDetailScreen(
                             onSelect = { style = it }
                             showSheet = true
                         }
+                    }
 
-                        // ===== COLOR =====
+                    Spacer(Modifier.height(16.dp))
+
+                    SectionCardModern("Внешний вид", Icons.Default.Tune) {
+
                         SelectRow("Цвет", color, Icons.Default.Tune) {
                             currentOptions = colorOptions.map { it.first }
                             onSelect = { color = it }
@@ -209,14 +234,13 @@ fun ClosetDetailScreen(
                             colorOptions.find { it.first == color }?.second ?: Color.Black
 
                         Box(
-                            modifier = Modifier
-                                .padding(start = 16.dp, top = 4.dp, bottom = 8.dp)
-                                .size(24.dp)
+                            Modifier
+                                .padding(start = 12.dp, top = 4.dp, bottom = 8.dp)
+                                .size(22.dp)
                                 .background(selectedColor, CircleShape)
-                                .border(1.dp, Color.Gray, CircleShape)
+                                .border(1.dp, Color.LightGray, CircleShape)
                         )
 
-                        // ===== MATERIAL =====
                         SelectRow("Материал", material, Icons.Default.Tune) {
                             currentOptions = materialOptions
                             onSelect = { material = it }
@@ -226,28 +250,81 @@ fun ClosetDetailScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    SectionCard("Дополнительно", Icons.Default.Tune) {
+                    SectionCardModern("Дополнительно", Icons.Default.Tune) {
 
-                        OutlinedTextField(
+                        ModernTextField(
                             value = brand,
-                            onValueChange = { brand = it },
-                            label = { Text("Бренд") },
-                            modifier = Modifier.fillMaxWidth()
+                            onChange = { brand = it },
+                            label = "Бренд"
                         )
 
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(10.dp))
 
-                        OutlinedTextField(
+                        ModernTextField(
                             value = price,
-                            onValueChange = { price = it },
-                            label = { Text("Цена") },
-                            modifier = Modifier.fillMaxWidth()
+                            onChange = { price = it },
+                            label = "Цена"
                         )
                     }
 
-                    Spacer(Modifier.height(80.dp)) // 👈 чтобы контент не прятался под кнопкой
+                    Spacer(Modifier.height(90.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun ModernTextField(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color.Black,
+            unfocusedBorderColor = Color.LightGray,
+            cursorColor = Color.Black,
+
+            focusedLabelColor = Color.Black,
+            unfocusedLabelColor = Color.Gray,
+
+            // 💜 убираем фиолетовые акценты полностью
+            selectionColors = TextSelectionColors(
+                handleColor = Color.Black,
+                backgroundColor = Color(0x33222222)
+            )
+        )
+    )
+}
+
+@Composable
+fun SectionCardModern(
+    title: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    ElevatedCard(
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp)) {
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null)
+                Spacer(Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium)
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            content()
         }
     }
 }

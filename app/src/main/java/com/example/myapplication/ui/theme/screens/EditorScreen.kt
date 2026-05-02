@@ -2,6 +2,7 @@ package com.example.myapplication.ui.theme.screens
 import android.graphics.*
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,6 +17,7 @@ import androidx.navigation.NavController
 import com.example.myapplication.MyApp
 import java.io.File
 import java.io.FileOutputStream
+import androidx.compose.ui.graphics.Color
 
 
 @Composable
@@ -39,35 +41,64 @@ fun EditorScreen(
 
     Scaffold(
         bottomBar = {
+            Surface(
+                color = Color.White,
+                shadowElevation = 12.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
 
-            Button(
-                onClick = {
-
-                    val finalBitmap = bitmap
-                        ?: BitmapFactory.decodeFile(imageFile.absolutePath)
-
-                    val outFile = File(
-                        imageFile.parentFile,
-                        "edited_${System.currentTimeMillis()}.png"
-                    )
-
-                    FileOutputStream(outFile).use { stream ->
-                        finalBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    // ❌ Cancel / Back button (outlined style)
+                    OutlinedButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Назад")
                     }
 
-                    vm.updateItem(
-                        item.copy(
-                            imageUri = outFile.absolutePath
+                    // 💙 Primary Save button (Google Material style)
+                    Button(
+                        onClick = {
+
+                            val finalBitmap = bitmap
+                                ?: BitmapFactory.decodeFile(imageFile.absolutePath)
+
+                            val outFile = File(
+                                imageFile.parentFile,
+                                "edited_${System.currentTimeMillis()}.png"
+                            )
+
+                            FileOutputStream(outFile).use { stream ->
+                                finalBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                            }
+
+                            vm.updateItem(
+                                item.copy(
+                                    imageUri = outFile.absolutePath
+                                )
+                            )
+
+                            navController.popBackStack()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
                         )
-                    )
-
-                    navController.popBackStack()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-
-            ) {
-                Text("Сохранить")
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Сохранить")
+                    }
+                }
             }
         }
     ) { padding ->
@@ -78,7 +109,7 @@ fun EditorScreen(
                 file = imageFile,
                 bitmap = bitmap,
                 onBitmapChange = { bitmap = it },
-                onSave = {}, // больше не нужен
+                onSave = {},
                 onInteractionChange = {}
             )
         }
