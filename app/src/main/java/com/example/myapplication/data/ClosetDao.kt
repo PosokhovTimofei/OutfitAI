@@ -37,4 +37,13 @@ interface ClosetDao {
 
     @Update
     suspend fun updateOutfit(outfit: OutfitEntity)
+
+    @Query("SELECT profileName FROM settings WHERE id = 0")
+    fun getProfileName(): Flow<String?>
+
+    @Insert
+    suspend fun insertSettings(settings: SettingsEntity)
+
+    @Update
+    suspend fun updateSettings(settings: SettingsEntity)
 }

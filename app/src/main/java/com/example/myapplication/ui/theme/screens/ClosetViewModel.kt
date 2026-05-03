@@ -16,6 +16,8 @@ class ClosetViewModel(
     private val repo: ClosetRepository
 ) : ViewModel() {
 
+
+
     val items = repo.getItems()
         .stateIn(
             viewModelScope,
@@ -101,6 +103,19 @@ class ClosetViewModel(
     fun deleteOutfit(outfit: OutfitEntity) {
         viewModelScope.launch {
             repo.deleteOutfit(outfit)
+        }
+    }
+
+    val profileName = repo.getProfileName()
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            "Имя"
+        )
+
+    fun updateProfileName(newName: String) {
+        viewModelScope.launch {
+            repo.setProfileName(newName)
         }
     }
 }

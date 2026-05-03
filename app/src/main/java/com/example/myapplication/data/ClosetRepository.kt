@@ -34,4 +34,12 @@ class ClosetRepository(
     suspend fun updateOutfit(outfit: OutfitEntity){
         dao.updateOutfit(outfit)
     }
+
+    fun getProfileName() = dao.getProfileName()
+
+    suspend fun setProfileName(name: String) {
+        val current = dao.getProfileName()
+        // проще: просто перезаписываем
+        dao.insertSettings(SettingsEntity(0, name))
+    }
 }
