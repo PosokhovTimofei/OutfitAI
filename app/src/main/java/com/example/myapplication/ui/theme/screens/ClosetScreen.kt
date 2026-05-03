@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Image
@@ -62,7 +63,7 @@ fun ClosetScreen(
     navController: NavController,
     modifier: Modifier = Modifier
 ) {
-
+    val interactionSource = remember { MutableInteractionSource() }
     var showFilters by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -233,7 +234,7 @@ fun ClosetScreen(
                             .aspectRatio(1f)
                             .then(
                                 if (isSelected)
-                                    Modifier.border(3.dp, MaterialTheme.colorScheme.primary)
+                                    Modifier.border(2.dp, Color.Black)
                                 else Modifier
                             )
                     ) {
@@ -242,6 +243,8 @@ fun ClosetScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .combinedClickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
 
                                     onClick = {
                                         if (isSelectionMode) {
@@ -281,15 +284,11 @@ fun ClosetScreen(
         }
 
         // ================= CREATE BUTTON =================
-        if (selectedItems.size == 3) {
+        if (selectedItems.size >= 2) {
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-            )
 
-            Button(
+
+            FloatingActionButton(
                 onClick = {
                     val encoded = selectedItems.joinToString(",") {
                         it.id.toString()
@@ -297,12 +296,13 @@ fun ClosetScreen(
 
                     navController.navigate("outfit_editor/$encoded")
                 },
+                containerColor = Color.Black,
+                contentColor = Color.White,
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(0.9f)
-                    .height(70.dp)
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
             ) {
-                Text("✨ Редактировать образ")
+                Icon(Icons.Default.Checkroom, contentDescription = null)
             }
         }
 
@@ -435,7 +435,7 @@ fun toggleSelect(
 
     if (list.contains(item)) {
         list.remove(item)
-    } else if (list.size < 3) {
+    } else {
         list.add(item)
     }
 
