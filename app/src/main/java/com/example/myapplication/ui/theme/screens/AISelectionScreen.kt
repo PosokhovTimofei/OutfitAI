@@ -3,6 +3,7 @@ package com.example.myapplication.ui.theme.screens
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -547,6 +548,19 @@ fun LottieWeatherCard(
     temperature: String,
     description: String
 ) {
+
+    // 🔥 безопасный парсинг температуры
+    val tempInt = remember(temperature) {
+        temperature
+            .replace("°C", "")
+            .replace("°", "")
+            .replace("+", "")
+            .trim()
+            .toIntOrNull() ?: 0
+    }
+
+    val isWarm = tempInt > 20
+
     val weatherType = remember(description) {
         when {
             description.contains("дожд", true) -> "rain"
@@ -555,6 +569,35 @@ fun LottieWeatherCard(
             else -> "cloud"
         }
     }
+
+    // 🌞 / ❄️ БИНАРНЫЙ ФОН (ключевая фикса)
+    val color1 by animateColorAsState(
+        targetValue = if (isWarm)
+            Color(0xFFFFD36E)      // тёплый
+        else
+            Color(0xFF0F172A),     // холодный тёмный
+        label = "c1"
+    )
+
+    val color2 by animateColorAsState(
+        targetValue = if (isWarm)
+            Color(0xFFFFE8A3)
+        else
+            Color(0xFF1E293B),
+        label = "c2"
+    )
+
+    val color3 by animateColorAsState(
+        targetValue = if (isWarm)
+            Color(0xFFFFF6D6)
+        else
+            Color(0xFF334155),
+        label = "c3"
+    )
+
+    val background = Brush.verticalGradient(
+        listOf(color1, color2, color3)
+    )
 
     val resId = when (weatherType) {
         "sun" -> R.raw.sun
@@ -573,7 +616,6 @@ fun LottieWeatherCard(
         isPlaying = true
     )
 
-    // 🌊 анимации движения карточки
     val infinite = rememberInfiniteTransition(label = "weather_card")
 
     val float by infinite.animateFloat(
@@ -596,42 +638,6 @@ fun LottieWeatherCard(
         label = "scale"
     )
 
-    // 🌌 ТЁМНЫЙ ПРЕМИУМ ФОН
-    val background = when (weatherType) {
-
-        "sun" -> Brush.radialGradient(
-            colors = listOf(
-                Color(0xFF1A1A2E),
-                Color(0xFF16213E),
-                Color(0xFF0F3460)
-            )
-        )
-
-        "rain" -> Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF0B1320),
-                Color(0xFF1B2A41),
-                Color(0xFF324A5F)
-            )
-        )
-
-        "snow" -> Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF0F172A),
-                Color(0xFF1E293B),
-                Color(0xFF334155)
-            )
-        )
-
-        else -> Brush.verticalGradient(
-            colors = listOf(
-                Color(0xFF0B0F1A),
-                Color(0xFF151B2E),
-                Color(0xFF1C2541)
-            )
-        )
-    }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -653,7 +659,7 @@ fun LottieWeatherCard(
                 .padding(16.dp)
         ) {
 
-            // 🌑 ВИНЬЕТКА (глубина как в iOS)
+            // 🌑 глубина
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -661,24 +667,9 @@ fun LottieWeatherCard(
                         Brush.radialGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color(0xAA000000)
+                                Color(0x66000000)
                             ),
                             radius = 900f
-                        )
-                    )
-            )
-
-            // ✨ СВЕЧЕНИЕ (атмосфера)
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.05f),
-                                Color.Transparent
-                            ),
-                            radius = 700f
                         )
                     )
             )
@@ -688,7 +679,6 @@ fun LottieWeatherCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
-                // 🌤 Lottie (слегка “плавает”)
                 LottieAnimation(
                     composition = composition,
                     progress = { progress },
@@ -706,18 +696,20 @@ fun LottieWeatherCard(
                     Text(
                         text = temperature,
                         style = MaterialTheme.typography.headlineLarge,
-                        color = Color.White
+                        color = if (isWarm) Color.Black else Color.White
                     )
 
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.85f)
+                        color = if (isWarm)
+                            Color.Black.copy(alpha = 0.7f)
+                        else
+                            Color.White.copy(alpha = 0.85f)
                     )
                 }
             }
 
-            // 🌬 декоративные частицы атмосферы
             Text(
                 text = "✦  ✦   ✦",
                 modifier = Modifier
@@ -726,7 +718,7 @@ fun LottieWeatherCard(
                         alpha = 0.25f
                         translationY = float
                     },
-                color = Color.White
+                color = if (isWarm) Color.Black else Color.White
             )
         }
     }

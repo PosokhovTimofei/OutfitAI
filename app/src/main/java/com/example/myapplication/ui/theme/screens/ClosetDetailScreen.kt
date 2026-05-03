@@ -46,10 +46,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.input.KeyboardType
 
 
 @Composable
@@ -255,7 +257,8 @@ fun ClosetDetailScreen(
                         ModernTextField(
                             value = brand,
                             onChange = { brand = it },
-                            label = "Бренд"
+                            label = "Бренд",
+                            keyboardType = KeyboardType.Text
                         )
 
                         Spacer(Modifier.height(10.dp))
@@ -263,7 +266,8 @@ fun ClosetDetailScreen(
                         ModernTextField(
                             value = price,
                             onChange = { price = it },
-                            label = "Цена"
+                            label = "Цена",
+                            keyboardType = KeyboardType.Number
                         )
                     }
 
@@ -278,7 +282,8 @@ fun ClosetDetailScreen(
 fun ModernTextField(
     value: String,
     onChange: (String) -> Unit,
-    label: String
+    label: String,
+    keyboardType: KeyboardType = KeyboardType.Text
 ) {
     OutlinedTextField(
         value = value,
@@ -287,15 +292,16 @@ fun ModernTextField(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
 
+        keyboardOptions = KeyboardOptions(
+            keyboardType = keyboardType
+        ),
+
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Color.Black,
             unfocusedBorderColor = Color.LightGray,
             cursorColor = Color.Black,
-
             focusedLabelColor = Color.Black,
             unfocusedLabelColor = Color.Gray,
-
-            // 💜 убираем фиолетовые акценты полностью
             selectionColors = TextSelectionColors(
                 handleColor = Color.Black,
                 backgroundColor = Color(0x33222222)

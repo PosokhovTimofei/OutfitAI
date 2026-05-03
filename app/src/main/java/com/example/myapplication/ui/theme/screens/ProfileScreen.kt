@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
@@ -66,9 +68,9 @@ fun ProfileScreen(
             ).toInt().coerceIn(0, 100)
 
     val insight = when {
-        styleScore < 40 -> "AI: гардероб можно усилить 🔝"
-        styleScore < 70 -> "AI: хороший стиль, но есть потенциал ⚡"
-        else -> "AI: стиль как у стилиста 🔥"
+        styleScore < 40 -> "ИИ: гардероб можно усилить 🔝"
+        styleScore < 70 -> "ИИ: хороший стиль, но есть потенциал ⚡"
+        else -> "ИИ: стиль как у стилиста 🔥"
     }
 
     LazyColumn(
@@ -255,6 +257,14 @@ fun ProfileScreen(
                 ),
                 shape = RoundedCornerShape(14.dp)
             ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "edit",
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
                 Text("Редактировать профиль")
             }
 

@@ -20,7 +20,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
     // ⏱ авто-переход через 2 секунды
     LaunchedEffect(Unit) {
         visible = true
-        delay(2000)
+        delay(1000)
         onStart()
     }
 
