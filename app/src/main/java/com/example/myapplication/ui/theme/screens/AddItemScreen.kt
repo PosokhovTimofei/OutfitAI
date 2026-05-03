@@ -538,6 +538,7 @@ fun AddItemScreen(
     Scaffold(
 
         bottomBar = {
+
             Button(
                 onClick = {
 
@@ -569,9 +570,23 @@ fun AddItemScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-
-
+                    .padding(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(14.dp),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
+
+                Icon(
+                    imageVector = Icons.Default.Save,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
                 Text("Сохранить")
             }
         }

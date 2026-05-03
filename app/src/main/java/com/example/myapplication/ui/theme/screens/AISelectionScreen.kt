@@ -7,13 +7,17 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,6 +39,10 @@ import java.io.FileOutputStream
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -48,6 +56,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
 import com.example.myapplication.R
+import androidx.compose.material3.ripple
+import androidx.compose.foundation.indication
+import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.ui.graphics.SolidColor
 
 // ================= STATE =================
 
@@ -100,6 +113,9 @@ fun String.containsAny(vararg words: String): Boolean {
     return words.any { this.contains(it, true) }
 }
 
+
+
+
 @Composable
 fun GenerateOutfitScreen(
     modifier: Modifier = Modifier
@@ -117,36 +133,22 @@ fun GenerateOutfitScreen(
     val items by vm.items.collectAsState(initial = emptyList())
 
     val styles = listOf(
-        "Классика",
-        "Кэжуал",
-        "Спорт",
-        "Офис",
-        "Вечеринка",
-        "Минимализм",
-        "Streetwear",
-        "Романтика",
-        "Смарт-кэжуал"
+        "Классика", "Кэжуал", "Спорт", "Офис",
+        "Вечеринка", "Минимализм", "Streetwear",
+        "Романтика", "Смарт-кэжуал"
     )
 
     var style by remember { mutableStateOf("Кэжуал") }
 
-    // ===== WEATHER =====
     var temperature by remember { mutableStateOf("...") }
     var weatherDesc by remember { mutableStateOf("Загрузка...") }
 
     LaunchedEffect(Unit) {
         try {
-            Log.d("WEATHER", "Start loading weather")
-
             val result = loadWeather()
-
-            Log.d("WEATHER", "Loaded: $result")
-
             temperature = result.first
             weatherDesc = result.second
-
         } catch (e: Exception) {
-            Log.e("WEATHER", "FAILED", e)
             temperature = "20°C"
             weatherDesc = "Ошибка загрузки"
         }
@@ -165,7 +167,6 @@ fun GenerateOutfitScreen(
                     .padding(24.dp)
             ) {
 
-                // ===== WEATHER =====
                 LottieWeatherCard(
                     temperature = temperature,
                     description = weatherDesc
@@ -176,170 +177,52 @@ fun GenerateOutfitScreen(
                 DropdownField("Стиль", styles, style) { style = it }
 
                 Spacer(Modifier.height(20.dp))
-
-                Button(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    onClick = {
-
-                        val tempValue = temperature.replace("°C", "").toIntOrNull() ?: 20
-
-                        val isCold = tempValue < 15
-                        val isRain = weatherDesc.containsAny("дожд", "ливень", "гроза", "rain", "пасмурн")
-                        val isBadWeather = isCold || isRain
-
-                        val ignoreWeather = style in listOf("Вечеринка", "Романтика")
-
-                        val tops = items.filter { isTop(it.type) }
-                        val bottoms = items.filter { isBottom(it.type) }
-                        val dresses = items.filter { isDress(it.type) }
-                        val outers = items.filter { isOuter(it.type) }
-                        val shoes = items.filter { isShoes(it.type) }
-
-                        outfitItems.clear()
-
-                        // ================= PROFILE =================
-                        data class Profile(
-                            val top: List<String>,
-                            val bottom: List<String>,
-                            val shoesFilter: (ClosetItemEntity) -> Boolean,
-                            val allowDress: Boolean,
-                            val allowOuterwear: Boolean
-                        )
-
-                        val profile = when (style) {
-
-                            "Классика" -> Profile(
-                                top = listOf("рубашк", "блуз", "пиджак"),
-                                bottom = listOf("брюк", "юбк"),
-                                shoesFilter = { isClassicShoes(it.type) },
-                                allowDress = true,
-                                allowOuterwear = true
-                            )
-
-                            "Офис" -> Profile(
-                                top = listOf("рубашк", "блуз", "пиджак"),
-                                bottom = listOf("брюк", "юбк"),
-                                shoesFilter = { isSneakers(it.type) || isClassicShoes(it.type) }, // 👈 БЕЗ БОТИНОК
-                                allowDress = true,
-                                allowOuterwear = false
-                            )
-
-                            "Спорт" -> Profile(
-                                top = listOf("худи", "футболк", "лонгслив"),
-                                bottom = listOf("джоггер", "леггинс"),
-                                shoesFilter = { isSneakers(it.type) },
-                                allowDress = false,
-                                allowOuterwear = true
-                            )
-
-                            "Смарт-кэжуал" -> Profile(
-                                top = listOf("рубашк", "поло", "свитер"),
-                                bottom = listOf("джинс", "брюк"),
-                                shoesFilter = { isSneakers(it.type) || isClassicShoes(it.type) },
-                                allowDress = true,
-                                allowOuterwear = true
-                            )
-
-                            "Streetwear" -> Profile(
-                                top = listOf("худи", "свитшот"),
-                                bottom = listOf("джинс"),
-                                shoesFilter = { isSneakers(it.type) },
-                                allowDress = false,
-                                allowOuterwear = true
-                            )
-
-                            "Романтика", "Вечеринка" -> Profile(
-                                top = listOf("топ", "блуз"),
-                                bottom = listOf("юбк"),
-                                shoesFilter = { isClassicShoes(it.type) },
-                                allowDress = true,
-                                allowOuterwear = true
-                            )
-
-                            else -> Profile(
-                                emptyList(),
-                                emptyList(),
-                                { true },
-                                true,
-                                true
-                            )
-                        }
-
-                        // ================= ОБУВЬ =================
-                        val validShoes = shoes.filter { profile.shoesFilter(it) }
-
-                        if (validShoes.isEmpty()) return@Button
-
-                        // ================= ПЛАТЬЕ =================
-                        val useDress =
-                            profile.allowDress &&
-                                    dresses.isNotEmpty() &&
-                                    !isBadWeather &&
-                                    (0..100).random() < 40
-
-                        if (useDress) {
-
-                            val dress = dresses.random()
-                            outfitItems.add(DraggableItem(dress, Offset(120f, 120f)))
-                            outfitItems.add(DraggableItem(validShoes.random(), Offset(140f, 380f)))
-
-                        } else {
-
-                            val top = tops
-                                .filter { profile.top.isEmpty() || it.type.containsAny(*profile.top.toTypedArray()) }
-                                .randomOrNull() ?: return@Button
-
-                            val bottom = bottoms
-                                .filter { profile.bottom.isEmpty() || it.type.containsAny(*profile.bottom.toTypedArray()) }
-                                .randomOrNull() ?: return@Button
-
-                            outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
-                            outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
-                            outfitItems.add(DraggableItem(validShoes.random(), Offset(140f, 380f)))
-                        }
-
-                        // ================= OUTERWEAR =================
-                        if (profile.allowOuterwear) {
-
-                            val outerCandidate = when (style) {
-
-                                "Спорт" -> outers.filter { isWindbreaker(it.type) }
-
-                                else -> outers
-                            }
-
-                            // 🔥 ВАЖНО: максимум 1 слой ВСЕГДА
-                            if (outerCandidate.isNotEmpty()) {
-
-                                val shouldAddOuter =
-                                    when {
-                                        isBadWeather -> true
-                                        isCold -> (0..100).random() < 50
-                                        else -> false
-                                    }
-
-                                if (shouldAddOuter) {
-                                    outerCandidate.randomOrNull()?.let {
-                                        outfitItems.add(DraggableItem(it, Offset(90f, 0f)))
-                                    }
-                                }
-                            }
-                        }
-
-                        if (outfitItems.size >= 2) {
-                            isCreated = true
-                        }
-                    }
-                ) {
-                    Text("Создать образ")
-                }
             }
+
+            // ================= КНОПКА (ВАЖНО) =================
+            FancyFAB(
+                onClick = {
+
+                    val tempValue =
+                        temperature.replace("°C", "").toIntOrNull() ?: 20
+
+                    val isCold = tempValue < 15
+                    val isRain = weatherDesc.containsAny(
+                        "дожд", "ливень", "гроза", "rain", "пасмурн"
+                    )
+                    val isBadWeather = isCold || isRain
+
+                    val tops = items.filter { isTop(it.type) }
+                    val bottoms = items.filter { isBottom(it.type) }
+                    val dresses = items.filter { isDress(it.type) }
+                    val outers = items.filter { isOuter(it.type) }
+                    val shoes = items.filter { isShoes(it.type) }
+
+                    outfitItems.clear()
+
+                    val validShoes = shoes
+                    if (validShoes.isEmpty()) return@FancyFAB
+
+                    val top = tops.randomOrNull() ?: return@FancyFAB
+                    val bottom = bottoms.randomOrNull() ?: return@FancyFAB
+
+                    outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
+                    outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
+                    outfitItems.add(
+                        DraggableItem(
+                            validShoes.random(),
+                            Offset(140f, 380f)
+                        )
+                    )
+
+                    isCreated = outfitItems.size >= 2
+                }
+            )
         }
 
-        // ===== EDITOR (без изменений) =====
+        // ================= RESULT =================
         if (isCreated) {
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -358,14 +241,18 @@ fun GenerateOutfitScreen(
                 }
             }
 
+
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
+
                 Button(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     onClick = {
                         scope.launch {
 
@@ -417,21 +304,93 @@ fun GenerateOutfitScreen(
                             isCreated = false
                             outfitItems.clear()
                         }
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
                 ) {
-                    Text("💾 Сохранить образ")
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Сохранить образ")
                 }
 
+                Spacer(Modifier.height(10.dp))
+
                 OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
                     onClick = {
                         isCreated = false
                         outfitItems.clear()
-                    }
+                    },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.Black
+                    ),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = SolidColor(Color.Black),
+                        width = 1.dp
+                    ),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
-                    Text("🔄 Другой образ")
+                    Icon(
+                        imageVector = Icons.Default.Autorenew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Другой образ")
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun FancyFAB(
+    onClick: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        label = ""
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        FloatingActionButton(
+            onClick = onClick,
+            interactionSource = interaction,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp) // 👈 ниже чем было
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .size(88.dp),
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            elevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = 12.dp,
+                pressedElevation = 6.dp
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = "Создать образ",
+                modifier = Modifier.size(34.dp)
+            )
         }
     }
 }
@@ -494,12 +453,24 @@ fun DropdownField(
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
+            shape = RoundedCornerShape(16.dp),
+
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded)
             },
+
             modifier = Modifier
                 .menuAnchor()
-                .fillMaxWidth()
+                .fillMaxWidth(),
+
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Black,
+                unfocusedBorderColor = Color.LightGray,
+                cursorColor = Color.Black,
+
+                focusedLabelColor = Color.Black,
+                unfocusedLabelColor = Color.Gray
+            )
         )
 
         ExposedDropdownMenu(
@@ -507,8 +478,14 @@ fun DropdownField(
             onDismissRequest = { expanded = false }
         ) {
             options.forEach { option ->
+
                 DropdownMenuItem(
-                    text = { Text(option) },
+                    text = {
+                        Text(
+                            option,
+                            color = if (option == selected) Color.Black else Color.DarkGray
+                        )
+                    },
                     onClick = {
                         onSelect(option)
                         expanded = false

@@ -39,7 +39,7 @@ fun FavoritesScreen(
     Column(modifier = modifier.fillMaxSize()) {
 
         Text(
-            text = "Избранные образы ❤️",
+            text = "Образы",
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp)
         )
