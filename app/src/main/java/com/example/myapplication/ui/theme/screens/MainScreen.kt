@@ -112,6 +112,16 @@ fun MainScreen() {
                 )
             }
 
+            composable("welcome") {
+                WelcomeScreen(
+                    onStart = {
+                        navController.navigate("closet") {
+                            popUpTo("welcome") { inclusive = true }
+                        }
+                    }
+                )
+            }
+
             composable("outfit_view/{id}") { backStackEntry ->
                 val id = backStackEntry.arguments
                     ?.getString("id")

@@ -14,7 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -39,8 +42,13 @@ fun FavoritesScreen(
     Column(modifier = modifier.fillMaxSize()) {
 
         Text(
-            text = "Образы",
-            style = MaterialTheme.typography.titleLarge,
+            text = "Сохранённые образы:",
+            style = TextStyle(
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.5).sp,
+                color = Color.Black
+            ),
             modifier = Modifier.padding(16.dp)
         )
 

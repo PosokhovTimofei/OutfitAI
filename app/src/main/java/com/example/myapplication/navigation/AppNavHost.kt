@@ -19,8 +19,10 @@ fun AppNavHost() {
 
         composable("welcome") {
             WelcomeScreen(
-                onStartClick = {
-                    navController.navigate("main")
+                onStart = {
+                    navController.navigate("main") {
+                        popUpTo("welcome") { inclusive = true }
+                    }
                 }
             )
         }
