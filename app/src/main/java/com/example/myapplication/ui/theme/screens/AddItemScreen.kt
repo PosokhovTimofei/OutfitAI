@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -40,6 +41,7 @@ import androidx.compose.ui.input.pointer.util.*
 import com.example.myapplication.data.TFLiteClassifier
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 
 // ==========================
 // 🔥 ЛАСТИК
@@ -679,7 +681,11 @@ fun AddItemScreen(
                             value = price,
                             onValueChange = { price = it },
                             label = { Text("Цена") },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number
+                            )
                         )
                         Log.d("ML_CHECK", "type=$type")
                     }
