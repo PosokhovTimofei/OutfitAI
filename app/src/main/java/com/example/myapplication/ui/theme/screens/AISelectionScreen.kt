@@ -549,7 +549,6 @@ fun LottieWeatherCard(
     description: String
 ) {
 
-    // 🔥 безопасный парсинг температуры
     val tempInt = remember(temperature) {
         temperature
             .replace("°C", "")
@@ -570,33 +569,13 @@ fun LottieWeatherCard(
         }
     }
 
-    // 🌞 / ❄️ БИНАРНЫЙ ФОН (ключевая фикса)
-    val color1 by animateColorAsState(
+    // ✅ ОДИН ЦВЕТ вместо градиента
+    val backgroundColor by animateColorAsState(
         targetValue = if (isWarm)
-            Color(0xFFFFD36E)      // тёплый
+            Color(0xFFFFE0A3) // светлый тёплый
         else
-            Color(0xFF0F172A),     // холодный тёмный
-        label = "c1"
-    )
-
-    val color2 by animateColorAsState(
-        targetValue = if (isWarm)
-            Color(0xFFFFE8A3)
-        else
-            Color(0xFF1E293B),
-        label = "c2"
-    )
-
-    val color3 by animateColorAsState(
-        targetValue = if (isWarm)
-            Color(0xFFFFF6D6)
-        else
-            Color(0xFF334155),
-        label = "c3"
-    )
-
-    val background = Brush.verticalGradient(
-        listOf(color1, color2, color3)
+            Color(0xFF1E293B), // тёмный
+        label = "bg"
     )
 
     val resId = when (weatherType) {
@@ -648,31 +627,15 @@ fun LottieWeatherCard(
                 translationY = float
             },
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(background)
                 .padding(16.dp)
         ) {
-
-            // 🌑 глубина
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color(0x66000000)
-                            ),
-                            radius = 900f
-                        )
-                    )
-            )
 
             Row(
                 modifier = Modifier.fillMaxSize(),
