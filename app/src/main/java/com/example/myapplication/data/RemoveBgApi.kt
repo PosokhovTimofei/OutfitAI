@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 
 object RemoveBgApi {
 
-    private const val BASE_URL = "http://192.168.50.91:8000/remove-bg"
+    private const val BASE_URL = "http://192.168.50.159:8000/remove-bg"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
