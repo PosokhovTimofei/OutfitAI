@@ -76,7 +76,8 @@ class ClosetViewModel(
     fun saveOutfit(
         itemIds: List<Long>,
         states: List<OutfitItemState>,
-        previewUri: String?
+        previewUri: String?,
+        style: String
     ) {
         viewModelScope.launch {
 
@@ -88,6 +89,7 @@ class ClosetViewModel(
                     itemIds = itemIds.joinToString(","),
                     layoutJson = json,
                     previewUri = previewUri,
+                    style = style,
                     createdAt = System.currentTimeMillis()
                 )
             )

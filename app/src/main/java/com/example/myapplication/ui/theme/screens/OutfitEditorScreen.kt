@@ -41,7 +41,8 @@ import kotlin.math.roundToInt
 @Composable
 fun OutfitEditorScreen(
     itemIds: String,
-    navController: NavController
+    navController: NavController,
+    style: String
 ) {
 
     val context = LocalContext.current
@@ -189,7 +190,8 @@ fun OutfitEditorScreen(
                             vm.saveOutfit(
                                 itemIds = idList,
                                 states = itemStates,
-                                previewUri = file.absolutePath
+                                previewUri = file.absolutePath,
+                                style = style
                             )
 
                             navController.navigate("favorites")

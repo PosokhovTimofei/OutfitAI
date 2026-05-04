@@ -1,23 +1,26 @@
 package com.example.myapplication.ui.theme.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -39,97 +42,130 @@ fun FavoritesScreen(
 
     val outfits by vm.outfits.collectAsState(initial = emptyList())
 
+    val styles = listOf(
+        "Классический",
+        "Повседневный",
+        "Спортивный",
+        "Уличный"
+    )
+
+    val grouped = outfits.groupBy { it.style }
+
+    var selectedStyle by remember { mutableStateOf<String?>(null) }
+
+    val visibleOutfits = selectedStyle?.let { style ->
+        outfits.filter { it.style == style }
+    } ?: outfits
+
     Column(modifier = modifier.fillMaxSize()) {
 
         Text(
-            text = "Сохранённые образы:",
-            style = TextStyle(
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = (-0.5).sp,
-                color = Color.Black
-            ),
-            modifier = Modifier.padding(16.dp)
+            text = "Сохраненные образы",
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.SemiBold
+            )
         )
 
-        if (outfits.isEmpty()) {
+        // ================= CHIPS =================
+        LazyRow(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
 
+            items(styles.size) { index ->
+
+                val style = styles[index]
+                val count = grouped[style]?.size ?: 0
+                val selected = selectedStyle == style
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(if (selected) Color.Black else Color.Transparent)
+                        .border(
+                            1.dp,
+                            if (selected) Color.Black else Color.LightGray,
+                            RoundedCornerShape(50)
+                        )
+                        .clickable {
+                            selectedStyle = if (selected) null else style
+                        }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    Text(
+                        text = style,
+                        color = if (selected) Color.White else Color.Black
+                    )
+
+                    Spacer(Modifier.width(6.dp))
+
+                    Text(
+                        text = count.toString(),
+                        color = if (selected) Color.White.copy(0.8f) else Color.Gray
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ================= EMPTY =================
+        if (visibleOutfits.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Пока нет сохранённых образов")
+                Text("No saved outfits")
             }
+            return
+        }
 
-        } else {
+        // ================= GRID =================
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            contentPadding = PaddingValues(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            items(visibleOutfits) { outfit ->
 
-                items(outfits) { outfit ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.5f)
+                        .clickable {
+                            navController.navigate("outfit_view/${outfit.id}")
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(0.5f),
-                        shape = MaterialTheme.shapes.medium,
-                        elevation = CardDefaults.cardElevation(
-                            defaultElevation = 8.dp
-                        ),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
+                    Box(modifier = Modifier.fillMaxSize()) {
+
+                        AsyncImage(
+                            model = outfit.previewUri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
                         )
-                    ) {
 
-                        Box(modifier = Modifier.fillMaxSize()) {
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clickable {
-                                        navController.navigate("outfit_view/${outfit.id}")
-                                    }
-                            ) {
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-
-                                    if (!outfit.previewUri.isNullOrEmpty()) {
-
-                                        AsyncImage(
-                                            model = outfit.previewUri,
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            alignment = Alignment.TopCenter,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-
-                                    }
-                                }
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    vm.deleteOutfit(outfit)
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Удалить",
-                                    tint = Color.Black
-                                )
-                            }
+                        // DELETE BUTTON
+                        IconButton(
+                            onClick = { vm.deleteOutfit(outfit) },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.Black
+                            )
                         }
                     }
                 }

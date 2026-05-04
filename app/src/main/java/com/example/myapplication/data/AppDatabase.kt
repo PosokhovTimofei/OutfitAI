@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
         OutfitEntity::class,
         SettingsEntity::class
     ],
-    version = 6
+    version = 7
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun closetDao(): ClosetDao

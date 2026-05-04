@@ -323,6 +323,7 @@ fun GenerateOutfitScreen(
                             vm.saveOutfit(
                                 itemIds = itemIds,
                                 states = states,
+                                style = style,
                                 previewUri = file.absolutePath
                             )
 

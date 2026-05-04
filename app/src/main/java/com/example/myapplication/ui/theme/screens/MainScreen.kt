@@ -103,11 +103,20 @@ fun MainScreen() {
                 )
             }
 
-            composable("outfit_editor/{ids}") { backStackEntry ->
+            composable(
+                route = "outfit_editor/{ids}/{style}",
+                arguments = listOf(
+                    navArgument("ids") { type = NavType.StringType },
+                    navArgument("style") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+
                 val ids = backStackEntry.arguments?.getString("ids") ?: ""
+                val style = backStackEntry.arguments?.getString("style") ?: "Повседневный"
 
                 OutfitEditorScreen(
                     itemIds = ids,
+                    style = style,
                     navController = navController
                 )
             }
