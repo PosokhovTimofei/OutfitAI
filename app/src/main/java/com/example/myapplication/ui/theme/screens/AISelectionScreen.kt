@@ -90,31 +90,52 @@ fun isShoes(type: String) = type.containsAny(
     "кроссов", "кед", "ботинк", "туфл", "сандал", "шлеп", "сапог", "лофер", "каблук"
 )
 
-fun isLightClothes(type: String): Boolean {
-    return type.containsAny(
-        "шорт",
-        "юбк",
-        "майк",
-        "топ",
-        "сарафан"
-    )
-}
 
-
-
-fun isSneakers(type: String) = type.containsAny("кроссов", "кед")
-fun isBoots(type: String) = type.containsAny("ботинк", "сапог")
-fun isClassicShoes(type: String) = type.containsAny("туф", "лофер", "каблук")
-fun isSummerShoes(type: String) = type.containsAny("сандал", "шлеп")
-
-fun isWindbreaker(type: String) =
-    type.containsAny("ветровк", "анорак")
 // helper
 fun String.containsAny(vararg words: String): Boolean {
     return words.any { this.contains(it, true) }
 }
 
+fun matchesStyle(itemStyle: String?, selectedStyle: String): Boolean {
+    if (itemStyle.isNullOrBlank()) return true // если нет стиля — не блокируем
 
+    return itemStyle.equals(selectedStyle, true) ||
+            itemStyle.equals("универсальный", true)
+}
+
+
+
+fun filterItemsForOutfit(
+    items: List<ClosetItemEntity>,
+    style: String,
+    temperature: Int
+): List<ClosetItemEntity> {
+
+    val isHot = temperature > 20
+
+    return items.filter { item ->
+
+        val type = item.type
+
+        // ✅ 1. СТИЛЬ ИЗ БД (ГЛАВНОЕ ИЗМЕНЕНИЕ)
+        if (!matchesStyle(item.style, style)) return@filter false
+
+        // ❌ туфли в повседневном стиле
+        if (style == "Повседневный" && type.containsAny("туфл")) return@filter false
+
+        // 🔥 жара
+        if (isHot) {
+            if (type.containsAny(
+                    "худи", "свит", "свитш", "толстов",
+                    "пуховик", "куртк", "пальто",
+                    "ботинк", "сапог"
+                )
+            ) return@filter false
+        }
+
+        true
+    }
+}
 
 
 @Composable
@@ -134,12 +155,10 @@ fun GenerateOutfitScreen(
     val items by vm.items.collectAsState(initial = emptyList())
 
     val styles = listOf(
-        "Классика", "Кэжуал", "Спорт", "Офис",
-        "Вечеринка", "Минимализм", "Streetwear",
-        "Романтика", "Смарт-кэжуал"
+        "Классический", "Повседневный", "Спортивный", "Уличный"
     )
 
-    var style by remember { mutableStateOf("Кэжуал") }
+    var style by remember { mutableStateOf("Повседневный") }
 
     var temperature by remember { mutableStateOf("...") }
     var weatherDesc by remember { mutableStateOf("Загрузка...") }
@@ -193,19 +212,25 @@ fun GenerateOutfitScreen(
                     )
                     val isBadWeather = isCold || isRain
 
-                    val tops = items.filter { isTop(it.type) }
-                    val bottoms = items.filter { isBottom(it.type) }
-                    val dresses = items.filter { isDress(it.type) }
-                    val outers = items.filter { isOuter(it.type) }
-                    val shoes = items.filter { isShoes(it.type) }
+
+
+
+                    val filteredItems = filterItemsForOutfit(items, style, tempValue)
+
+                    val tops = filteredItems.filter { isTop(it.type) }
+                    val bottoms = filteredItems.filter { isBottom(it.type) }
+                    val dresses = filteredItems.filter { isDress(it.type) }
+                    val outers = filteredItems.filter { isOuter(it.type) }
+                    val shoes = filteredItems.filter { isShoes(it.type) }
 
                     outfitItems.clear()
 
-                    val validShoes = shoes
-                    if (validShoes.isEmpty()) return@FancyFAB
+
+
 
                     val top = tops.randomOrNull() ?: return@FancyFAB
                     val bottom = bottoms.randomOrNull() ?: return@FancyFAB
+                    val validShoes = shoes
 
                     outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
                     outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
