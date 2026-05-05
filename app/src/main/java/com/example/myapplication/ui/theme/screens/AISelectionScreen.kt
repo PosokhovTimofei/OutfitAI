@@ -103,6 +103,7 @@ fun matchesStyle(itemStyle: String?, selectedStyle: String): Boolean {
             itemStyle.equals("универсальный", true)
 }
 
+fun isJacket(type: String) = type.containsAny("пиджак", "блейзер")
 
 
 fun filterItemsForOutfit(
@@ -203,43 +204,77 @@ fun GenerateOutfitScreen(
             FancyFAB(
                 onClick = {
 
-                    val tempValue =
-                        temperature.replace("°C", "").toIntOrNull() ?: 20
-
-                    val isCold = tempValue < 15
-                    val isRain = weatherDesc.containsAny(
-                        "дожд", "ливень", "гроза", "rain", "пасмурн"
-                    )
-                    val isBadWeather = isCold || isRain
-
-
-
+                    val tempValue = -10
+//                        temperature.replace("°C", "").toIntOrNull() ?: 20
 
                     val filteredItems = filterItemsForOutfit(items, style, tempValue)
 
                     val tops = filteredItems.filter { isTop(it.type) }
                     val bottoms = filteredItems.filter { isBottom(it.type) }
                     val dresses = filteredItems.filter { isDress(it.type) }
-                    val outers = filteredItems.filter { isOuter(it.type) }
                     val shoes = filteredItems.filter { isShoes(it.type) }
+
+                    val jackets = items.filter {
+                        isJacket(it.type) && matchesStyle(it.style, style)
+                    }
 
                     outfitItems.clear()
 
+                    var usedDress = false
+                    var usedTopBottom = false
 
+                    // ================= ЛОГИКА =================
 
+                    val useDress =
+                        dresses.isNotEmpty() &&
+                                style == "Классический" &&
+                                kotlin.random.Random.nextFloat() < 0.6f // 👈 НЕ всегда платье
 
-                    val top = tops.randomOrNull() ?: return@FancyFAB
-                    val bottom = bottoms.randomOrNull() ?: return@FancyFAB
-                    val validShoes = shoes
+                    if (useDress) {
 
-                    outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
-                    outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
-                    outfitItems.add(
-                        DraggableItem(
-                            validShoes.random(),
-                            Offset(140f, 380f)
-                        )
-                    )
+                        val dress = dresses.randomOrNull() ?: return@FancyFAB
+                        val shoesItem = shoes.randomOrNull() ?: return@FancyFAB
+
+                        outfitItems.add(DraggableItem(dress, Offset(110f, 80f)))
+                        outfitItems.add(DraggableItem(shoesItem, Offset(130f, 360f)))
+
+                        usedDress = true
+
+                    } else {
+
+                        val top = tops.randomOrNull() ?: return@FancyFAB
+                        val bottom = bottoms.randomOrNull() ?: return@FancyFAB
+                        val shoesItem = shoes.randomOrNull() ?: return@FancyFAB
+
+                        outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
+                        outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
+                        outfitItems.add(DraggableItem(shoesItem, Offset(140f, 380f)))
+
+                        usedTopBottom = true
+                    }
+
+                    // ================= ПИДЖАК =================
+
+                    val canAddJacket =
+                        style == "Классический" &&
+                                jackets.isNotEmpty() &&
+                                kotlin.random.Random.nextFloat() < 0.4f // 👈 не всегда
+
+                    if (canAddJacket) {
+
+                        val jacket = jackets.random()
+
+                        // ❗ ВАЖНО: НЕ добавляем к платью
+                        if (!usedDress) {
+
+                            outfitItems.add(
+                                DraggableItem(
+                                    jacket,
+                                    Offset(90f, 20f)
+                                )
+                            )
+                        }
+                    }
 
                     isCreated = outfitItems.size >= 2
                 }
