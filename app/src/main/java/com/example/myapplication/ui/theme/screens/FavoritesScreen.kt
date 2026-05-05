@@ -43,6 +43,7 @@ fun FavoritesScreen(
     val outfits by vm.outfits.collectAsState(initial = emptyList())
 
     val styles = listOf(
+        "Все",
         "Классический",
         "Повседневный",
         "Спортивный",
@@ -51,11 +52,12 @@ fun FavoritesScreen(
 
     val grouped = outfits.groupBy { it.style }
 
-    var selectedStyle by remember { mutableStateOf<String?>(null) }
+    var selectedStyle by remember { mutableStateOf("Все") }
 
-    val visibleOutfits = selectedStyle?.let { style ->
-        outfits.filter { it.style == style }
-    } ?: outfits
+    val visibleOutfits = when (selectedStyle) {
+        "Все" -> outfits
+        else -> outfits.filter { it.style == selectedStyle }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
 
@@ -76,7 +78,13 @@ fun FavoritesScreen(
             items(styles.size) { index ->
 
                 val style = styles[index]
-                val count = grouped[style]?.size ?: 0
+
+                val count = if (style == "Все") {
+                    outfits.size
+                } else {
+                    grouped[style]?.size ?: 0
+                }
+
                 val selected = selectedStyle == style
 
                 Row(
@@ -89,7 +97,7 @@ fun FavoritesScreen(
                             RoundedCornerShape(50)
                         )
                         .clickable {
-                            selectedStyle = if (selected) null else style
+                            selectedStyle = style
                         }
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -118,7 +126,7 @@ fun FavoritesScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No saved outfits")
+                Text("Нет сохранённых образов")
             }
             return
         }
@@ -156,7 +164,7 @@ fun FavoritesScreen(
                             modifier = Modifier.fillMaxSize()
                         )
 
-                        // DELETE BUTTON
+
                         IconButton(
                             onClick = { vm.deleteOutfit(outfit) },
                             modifier = Modifier.align(Alignment.TopEnd)
