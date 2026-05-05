@@ -364,37 +364,16 @@ fun ClosetScreen(
         // ================= LOADING =================
         if (isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(
+                    color = Color.Black,              // цвет крутилки
+                    strokeWidth = 4.dp,               // толщина
+                    modifier = Modifier.size(40.dp)   // размер
+                )
             }
         }
     }
 }
 
-@Composable
-fun BigActionButton(
-    icon: ImageVector,
-    text: String,
-    background: Color,
-    onClick: () -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = Color.White.copy(alpha = 0.95f),
-        tonalElevation = 10.dp,
-        modifier = Modifier.shadow(20.dp, RoundedCornerShape(28.dp))
-    ) {
-        Button(
-            onClick = onClick,
-            colors = ButtonDefaults.buttonColors(containerColor = background),
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier.height(56.dp)
-        ) {
-            Icon(icon, contentDescription = null, tint = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text(text)
-        }
-    }
-}
 
 /**
  * 🔥 ОБРАБОТКА КАРТИНКИ (File → File)

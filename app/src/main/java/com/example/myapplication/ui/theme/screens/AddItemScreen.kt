@@ -619,11 +619,10 @@ fun AddItemScreen(
             item {
                 Column(modifier = Modifier.padding(16.dp)) {
 
-                    OutlinedTextField(
+                    ModernTextField(
                         value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Название") },
-                        modifier = Modifier.fillMaxWidth()
+                        onChange = { name = it },
+                        label = "Название"
                     )
 
                     Spacer(Modifier.height(16.dp))
