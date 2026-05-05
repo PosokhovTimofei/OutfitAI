@@ -71,23 +71,75 @@ data class DraggableItem(
 )
 
 fun isTop(type: String) = type.containsAny(
-    "футболк", "рубашк", "лонгслив", "худи", "свит", "поло", "топ", "блуз", "майк", "корсет"
+    "футболк",
+    "рубашк",
+    "лонгслив",
+    "худи",
+    "свитш",
+    "свитер",
+    "поло",
+    "топ",
+    "блуз",
+    "майк",
+    "корсет",
+    "кардиган",
 )
 
 fun isBottom(type: String) = type.containsAny(
-    "джинс", "брюк", "шорт", "юбк", "леггинс", "джоггер"
+    "джинс",
+    "брюк",
+    "шорт",
+    "юбк",
+    "леггинс",
+    "джоггер",
+    "штаны"
 )
 
 fun isDress(type: String) = type.containsAny(
-    "плать", "сарафан"
+    "плать",
+    "сарафан",
+    "комбинезон",
+    "ромпер"
 )
 
 fun isOuter(type: String) = type.containsAny(
-    "куртк", "пальто", "пиджак", "ветровк", "пуховик", "тренч", "кардиган", "бомбер", "косух"
+    "куртк",
+    "пальто",
+    "пиджак",
+    "жилет",
+    "ветровк",
+    "пуховик",
+    "тренч",
+    "бомбер",
+    "косух"
 )
 
 fun isShoes(type: String) = type.containsAny(
-    "кроссов", "кед", "ботинк", "туфл", "сандал", "шлеп", "сапог", "лофер", "каблук"
+    "кроссов",
+    "кед",
+    "ботинк",
+    "туфл",
+    "балетк",
+    "босонож",
+    "шлеп",
+    "сапог",
+    "ботильон",
+    "лофер",
+)
+
+fun isAccessory(type: String) = type.containsAny(
+    "шапк",
+    "кепк",
+    "панам",
+    "берет",
+    "шарф",
+    "платок",
+    "перчат",
+    "сумк",
+    "рюкзак",
+    "клатч",
+    "очк",
+    "ремень"
 )
 
 
@@ -112,24 +164,70 @@ fun filterItemsForOutfit(
     temperature: Int
 ): List<ClosetItemEntity> {
 
-    val isHot = temperature > 20
+    val isHot = temperature >= 20
+    val isCold = temperature < 20
+    val isFreezing = temperature < 0
 
     return items.filter { item ->
 
         val type = item.type
 
-        // ✅ 1. СТИЛЬ ИЗ БД (ГЛАВНОЕ ИЗМЕНЕНИЕ)
+        // ======================
+        // 🎯 СТИЛЬ
+        // ======================
         if (!matchesStyle(item.style, style)) return@filter false
 
-        // ❌ туфли в повседневном стиле
-        if (style == "Повседневный" && type.containsAny("туфл")) return@filter false
+        if (style == "Повседневный" && type.containsAny("туфл")) {
+            return@filter false
+        }
 
-        // 🔥 жара
+        // ======================
+        // 🔥 ЖАРА
+        // ======================
         if (isHot) {
+
             if (type.containsAny(
-                    "худи", "свит", "свитш", "толстов",
-                    "пуховик", "куртк", "пальто",
-                    "ботинк", "сапог"
+                    "худи", "свитш", "толстов",
+                    "пуховик", "пальто", "куртк",
+                    "ботинк", "сапог", "кардигвн", "лонгслив", "кардиган", "свитер"
+                )
+            ) return@filter false
+        }
+
+        // ======================
+        // 🌤 ХОЛОД (0–15)
+        // ======================
+        if (isCold && !isFreezing) {
+
+            // убираем лето
+            if (type.containsAny(
+                    "шорт", "майк", "топ", "сарафан", "юбк", "платье", "сапог", "ботинк", "пуховик", "комбинезон",
+                    "ромпер"
+                )
+            ) return@filter false
+
+            // ВАЖНО:
+            // куртки / худи / свитеры — НЕ трогаем
+        }
+
+        // ======================
+        // 🥶 МОРОЗ (< 0)
+        // ======================
+        if (isFreezing) {
+
+            // убираем лёгкие куртки
+            if (type.containsAny(
+                    "ветровк", "бомбер", "косух", "джинсовк"
+                )
+            ) return@filter false
+
+            // оставляем ТОЛЬКО тёплое ядро
+            if (!type.containsAny(
+                    "пуховик",
+                    "свитер",
+                    "худи",
+                    "ботинк",
+                    "сапог", "свитшот", "штаны"
                 )
             ) return@filter false
         }
@@ -200,11 +298,13 @@ fun GenerateOutfitScreen(
                 Spacer(Modifier.height(20.dp))
             }
 
+
+
             // ================= КНОПКА (ВАЖНО) =================
             FancyFAB(
                 onClick = {
 
-                    val tempValue = -10
+                    val tempValue = 10
 //                        temperature.replace("°C", "").toIntOrNull() ?: 20
 
                     val filteredItems = filterItemsForOutfit(items, style, tempValue)
@@ -213,22 +313,19 @@ fun GenerateOutfitScreen(
                     val bottoms = filteredItems.filter { isBottom(it.type) }
                     val dresses = filteredItems.filter { isDress(it.type) }
                     val shoes = filteredItems.filter { isShoes(it.type) }
-
-                    val jackets = items.filter {
-                        isJacket(it.type) && matchesStyle(it.style, style)
-                    }
+                    val outer = filteredItems.filter { isOuter(it.type) } // 👈 куртки теперь ЗДЕСЬ
 
                     outfitItems.clear()
 
                     var usedDress = false
-                    var usedTopBottom = false
 
-                    // ================= ЛОГИКА =================
-
+                    // =========================
+                    // 👗 ВЫБОР ПЛАТЬЯ
+                    // =========================
                     val useDress =
                         dresses.isNotEmpty() &&
-                                style == "Классический" &&
-                                kotlin.random.Random.nextFloat() < 0.6f // 👈 НЕ всегда платье
+                                (style == "Классический" || style == "Повседневный") &&
+                                kotlin.random.Random.nextFloat() < 0.6f
 
                     if (useDress) {
 
@@ -249,37 +346,43 @@ fun GenerateOutfitScreen(
                         outfitItems.add(DraggableItem(top, Offset(100f, 50f)))
                         outfitItems.add(DraggableItem(bottom, Offset(120f, 220f)))
                         outfitItems.add(DraggableItem(shoesItem, Offset(140f, 380f)))
-
-                        usedTopBottom = true
                     }
 
-                    // ================= ПИДЖАК =================
+                    // =========================
+                    // 🧥 ВЕРХНЯЯ ОДЕЖДА (НОВАЯ ЛОГИКА)
+                    // =========================
 
-                    val canAddJacket =
-                        style == "Классический" &&
-                                jackets.isNotEmpty() &&
-                                kotlin.random.Random.nextFloat() < 0.4f // 👈 не всегда
-
-                    if (canAddJacket) {
-
-                        val jacket = jackets.random()
-
-                        // ❗ ВАЖНО: НЕ добавляем к платью
-                        if (!usedDress) {
-
-                            outfitItems.add(
-                                DraggableItem(
-                                    jacket,
-                                    Offset(90f, 20f)
-                                )
-                            )
+                    val jacketChance =
+                        when {
+                            tempValue <= 0 -> 1.0f      // ❄️ всегда нужен слой
+                            tempValue <= 15 -> 0.7f     // 🌤 часто нужен
+                            else -> 0.0f               // 🔥 почти никогда
                         }
+
+                    val shouldAddOuter =
+                        outer.isNotEmpty() &&
+                                kotlin.random.Random.nextFloat() < jacketChance
+
+                    if (shouldAddOuter && !usedDress) {
+
+                        val outerItem = outer.random()
+
+                        outfitItems.add(
+                            DraggableItem(
+                                outerItem,
+                                Offset(90f, 20f)
+                            )
+                        )
                     }
 
                     isCreated = outfitItems.size >= 2
                 }
             )
         }
+
+
+
+
 
         // ================= RESULT =================
         if (isCreated) {
